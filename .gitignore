@@ -1,0 +1,98 @@
+# SWAT+ - MODFLOW 6 Coupling Repository
+
+## Project specific setup
+
+# Model directories (git-ignored)
+models/
+*/modflow/
+*/swatplus/
+
+# Data files (large, git-ignored)
+*.tif
+*.gpkg
+*.shp
+*.dbf
+*.shx
+*.prj
+*.cpg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Development
+.venv
+venv/
+ENV/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+
+# Output files
+results/
+coupling_output/
+analysis/
+*.log
+*.csv
+*.h5
+*.nc
+*.out
+
+# Hydrogeology raw and processed data
+data/hydrogeology/
+
+# PRISM weather data cache/output
+prism_raw/
+prism_data/
+prism_data_*/
+swatplus_weather/
+data/prism_raw/
+data/prism_bulk_raw*/
+data/prism_*/
+data/swatplus_weather*/
+
+# Session notes and paper drafts (private — tracked in dev repo only)
+docs/WORK_LOG*.md
+docs/PAPER_NOTES.md
+
+# Remote cheat sheet:
+#   git push                     → origin  (swatplus-modflow6-dev,      private)
+#   git push public main --force → public  (swatplus-modflow6-coupling, public release)
+
+# OS
+.DS_Store
+Thumbs.db

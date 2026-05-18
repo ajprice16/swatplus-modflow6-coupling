@@ -1,0 +1,4 @@
+# PRISM stations requested for SWAT+ weather extraction
+# Format: STATION_NAME LAT LON ELEV NBYR
+AZCANELORS 31.55 -110.52 1524 10
+AZTUMACACORI 31.57 -111.05 996.7 10
