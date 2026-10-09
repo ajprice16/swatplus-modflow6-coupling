@@ -239,7 +239,11 @@ def capture(out_root: Path) -> int:
     print(f"captured {len(info['windows']) - len(bad) - len(skipped)}/{len(info['windows'])} windows cleanly "
           f"into {out} ({len(skipped)} skipped on this platform)")
     for n, w in bad.items():
-        print(f"  {n}: {w.get('error') or '; '.join(w['problems'])}")
+        msg = w.get('error') or '; '.join(w['problems'])
+        print(f"  {n}: {msg}")
+        if os.environ.get("GITHUB_ACTIONS"):
+            tail = " | ".join((w.get("traceback") or "").strip().splitlines()[-6:])
+            print(f"::error title=GUI {tag} {n}::{(msg + ' || ' + tail)[:900].replace('%', '%25')}")
     return 0 if not bad else 1
 
 
