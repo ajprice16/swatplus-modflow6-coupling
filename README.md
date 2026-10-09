@@ -1,106 +1,112 @@
 # SWAT+ – MODFLOW 6 Coupling Framework
 
-A location-agnostic Python framework for coupling the SWAT+ watershed model
-with MODFLOW 6 for integrated surface–subsurface hydrologic simulation.
+A location-agnostic Python package that couples the SWAT+ watershed model with MODFLOW 6 for integrated
+surface–subsurface simulation. Every model path, grid and coordinate system is supplied by the user; no
+study-area data or defaults are included.
 
-The package is location-agnostic: every model path, grid and coordinate
-system is supplied by the user. No study-area data or defaults are included.
+## What it provides
 
-## What this package provides
-
-- **Library** (`swatplus_modflow/`): geographic mapping, flux translation,
-  FloPy and BMI/XMI MODFLOW interfaces, coupling invariants (mass balance,
-  CRS, temporal sync, indexing), and a high-level `SWATPlusMODFLOWCoupler`
-  facade.
-- **CLIs / scripts**: path-parameterized monthly coupler and SWAT+
-  calibration drivers, environment checks, STR→RIV conversion, and a
-  smalltest MF6 builder that requires explicit watershed paths.
-- **Examples & GIS docs**: connection-file workflow for any watershed.
-- **Tests**: unit and invariant tests with no study-area hardcodes.
-
-## Architecture note
-
-The public `SWATPlusMODFLOWCoupler` API is the stable library surface
-documented below. Production daily in-memory coupling (libmf6 / XMI) is
-evolving into this package; application-specific runners stay outside
-this repository. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-and [docs/SOFTWARE_SCOPE.md](docs/SOFTWARE_SCOPE.md).
+- **Daily coupled engine** (`swatplus-modflow run`): steps MODFLOW 6 one day at a time through libmf6 (XMI) with SWAT+
+  percolation as recharge and SWAT+ channel flow as SFR runoff, with mass-balance and injection checks every step.
+- **Builders** (`build-modflow`, `build-connections`): turn GIS layers into a MODFLOW 6 model and into the
+  `hru_cells.csv` / `channel_cells.csv` tables the engine reads.
+- **Project file** (`project.yaml`): the single description of a run, validated before anything starts.
+- Library modules (translation, invariants, MODFLOW/SWAT+ interfaces) and a deprecated facade (see below).
 
 ## Installation
 
 ```bash
 git clone <this-repo-url>
 cd swatplus-modflow6-coupling
-python3 -m venv venv
-source venv/bin/activate
-python3 -m pip install -e ".[dev]"
-python3 -c "import swatplus_modflow; print(swatplus_modflow.__version__)"
+python3 -m venv venv && source venv/bin/activate
+python3 -m pip install -e ".[bmi,gis]"        # engine + builders;  ".[dev]" adds the test tools
+swatplus-modflow version
 ```
+
+Extras: `bmi` = `xmipy`, `modflowapi` (needed by `run`); `gis` = `geopandas`, `rasterio`, `shapely`, `pyproj`
+(needed by the builders); `dev` = test tools plus both. Python 3.10–3.13.
 
 ### Binaries
 
-Install MODFLOW 6 and SWAT+ for your platform, then point at them in
-`config.yaml` (see [config.example.yaml](config.example.yaml)) or via CLI flags
-/ environment variables used by the generic scripts.
+* **MODFLOW 6 and libmf6** (the shared library, `.so` / `.dylib` / `.dll`): `python -m flopy.utils.get_modflow <folder> --repo modflow6`
+  downloads them. Point `modflow.libmf6` in the project file at the library.
+* **SWAT+**: install the executable for your platform and set `swatplus.executable`, or run SWAT+ yourself and set
+  `swatplus.run_swatplus: false` to use the daily outputs already in `TxtInOut`.
 
-## Quick start (library)
+SWAT+ must write `hru_wb_day` and `channel_sd_day` (`.txt` or `.csv`) via `print.prt`.
 
-```python
-from swatplus_modflow import SWATPlusMODFLOWCoupler
-
-coupler = SWATPlusMODFLOWCoupler(
-    modflow_dir="path/to/modflow/model",
-    swatplus_dir="path/to/swatplus/TxtInOut",
-    geo_connections_file="connections.gpkg",
-    config_file="config.yaml",
-)
-coupler.load_geographic_connections()
-coupler.run(start_date="2020-01-01", end_date="2020-12-31", output_dir="./results")
-```
-
-## Generic CLIs
+## Command line
 
 ```bash
-# Monthly one-way / two-way coupler (all paths required)
-python scripts/run_coupled_model_generic.py \
-  --swat-dir /path/to/TxtInOut \
-  --mf6-exe /path/to/mf6 \
-  --mf6-model /path/to/model \
-  --start-year 1995 --end-year 2019
-
-# Toy MF6 grid over any QSWAT+ watershed
-python scripts/create_smalltest_modflow_model.py \
-  --domain /path/to/lsus2.shp \
-  --swat-txt /path/to/TxtInOut \
-  --mf6 /path/to/mf6
+swatplus-modflow version
+swatplus-modflow build-connections --grid grid.json --hrus hrus.gpkg --channels channels.gpkg --out-dir connections
+swatplus-modflow build-modflow build.yaml          # writes the MODFLOW folder and modflow/sfr_reaches.csv
+swatplus-modflow validate project.yaml
+swatplus-modflow run project.yaml
 ```
 
-## Geographic connections
+`python -m swatplus_modflow <command>` is identical. Exit codes: `0` success, `1` invalid project or inputs
+(nothing was run), `2` the run started and failed. `validate` prints `ERROR:` / `WARNING:` lines. `run` prints
+`PROGRESS <done>/<total> <date>` lines and ends with `RESULT succeeded <absolute manifest path>` or
+`RESULT failed <reason>`. Everything written is listed in `<output.directory>/run_manifest.json`. The formats are
+specified in [docs/DATA_CONTRACTS.md](docs/DATA_CONTRACTS.md).
 
-See [docs/GIS_QUICKSTART.md](docs/GIS_QUICKSTART.md) and
-[docs/GIS_PREPROCESSING.md](docs/GIS_PREPROCESSING.md). Validate with:
+`run` does not build the MODFLOW model: build is a separate, deliberate step with its own spec. If
+`connections.channel_reaches` (the `sfr_reaches.csv` that `build-modflow` writes) does not exist, `validate` and
+`run` stop with an error that says to run `build-modflow` first.
 
-```bash
-python examples/validate_connections.py connections.gpkg --modflow-grid NROW NCOL NLAY
-```
+## Typical workflow
+
+1. **Grid.** Write `grid.json` (docs/DATA_CONTRACTS.md section 2): lower-left origin, uniform cells, projected CRS.
+2. **Connections.** `build-connections` intersects QSWAT+ HRU polygons (id field `HRUS` by default; `--hru-id-field`)
+   and channel lines (id field `Channel`; `--channel-id-field`) with the grid. Layers must have a CRS equal to the grid's
+   (or pass `--reproject`). Channel direction is `as_drawn` (vertices run upstream to downstream), `reversed`, or
+   inferred from a DEM. HRUs partly outside the grid keep fractions below 1; that is reported, never rescaled.
+3. **MODFLOW model.** `build-modflow build.yaml` (see [build.example.yaml](build.example.yaml)) builds the model from a
+   DEM, layer thicknesses or bottom rasters, a domain polygon, hydraulic zones, SFR from `channel_cells.csv`, optional EVT
+   and CHD/DRN boundaries. It writes the MODFLOW 6 simulation, `sfr_reaches.csv`, `grid.json`, `grid_cells.gpkg`,
+   `zone_report.csv` and `build_report.json`. Zone overlaps are resolved by an explicit, unique `priority` per zone, and
+   the report says how many cells each zone set and lost; a zone that overrides others and covers too much of the domain
+   fails the build (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Run the model once to steady state to obtain heads
+   for `modflow.initial_heads`.
+4. **Run.** Copy [project.example.yaml](project.example.yaml), point it at the files, `validate`, then `run`.
+
+## Project file (summary)
+
+`schema_version: 1`, `name`, `crs`, then sections `swatplus` (`txtinout`, `executable`, `run_swatplus`), `modflow`
+(`sim_dir`, `model_name`, `libmf6`, `initial_heads`, `solver`), `connections` (`hru_cells`, `channel_reaches`; optional
+`channel_cells`, `grid`, `well_cells`), `period` (`start`, `end`, `spinup_days`), `coupling` (`recharge_update`
+`daily|monthly|monthly_ramped`, `recharge_delay_days`, `recharge_to_water_table`, `et_extinction_depth_m`,
+`pumping_scale`, optional `evt_monthly_factors`, `well_auto_flow_reduce`, `transmission_loss`), `checks`
+(`enforce_invariants`, `mass_balance_tolerance_percent`, `allow_nonconvergence_steps`) and `output` (`directory`,
+`prefix`, `save_*`). Relative paths resolve against the project file's folder; unknown keys are rejected. The JSON Schema
+is [docs/project_schema.json](docs/project_schema.json).
+
+The MODFLOW model must use `LENGTH_UNITS METERS` and `TIME_UNITS DAYS`, a structured grid, an array-based recharge
+package, an SFR package, and stress data for period 1 only; the engine copies the folder and drives the copy.
+
+## Deprecated: `SWATPlusMODFLOWCoupler`
+
+The earlier file-based facade cannot apply daily forcing (it solved the unchanged files on disk every day) and now raises
+`FileBasedCouplingNotSupported` from its MODFLOW interface; constructing it emits a `DeprecationWarning`. Use the engine.
+The legacy monthly scripts under `scripts/` are unchanged.
 
 ## Integrity rules
 
-Coupling changes must preserve mass balance (m³/day), temporal aggregation,
-and CRS/index alignment. See `.cursorrules` and
-`swatplus_modflow.utils.coupling_invariants`.
+Coupling changes must preserve mass balance (m³/day), temporal aggregation, and CRS/index alignment. See `.cursorrules`
+and `swatplus_modflow.utils.coupling_invariants`.
 
 ## Contributing
 
-Generic improvements developed while applying the package to a particular
-watershed are welcome, provided they carry no study-area paths, names or data.
-See [docs/SOFTWARE_SCOPE.md](docs/SOFTWARE_SCOPE.md); the test suite includes
-a guard (`tests/test_no_study_area_content.py`) that fails on common leaks.
+Generic improvements developed while applying the package to a particular watershed are welcome, provided they carry no
+study-area paths, names or data. See [docs/SOFTWARE_SCOPE.md](docs/SOFTWARE_SCOPE.md); the test suite includes a guard
+(`tests/test_no_study_area_content.py`) that fails on common leaks.
 
 ## Testing
 
 ```bash
-pytest tests/ -v
+pytest -q                                   # no binaries needed; end-to-end tests skip without libmf6
+SWATPLUS_TEST_LIBMF6=/path/to/libmf6.so pytest -q    # runs the end-to-end tests through real libmf6
 ```
 
 ## License

@@ -28,6 +28,9 @@ def _lib_names():
     return ["libmf6.dylib"] if sys.platform == "darwin" else ["libmf6.so"]
 
 
+LIB_REQUIRED = bool(os.environ.get("SWATPLUS_REQUIRE_LIBMF6"))
+
+
 def find_libmf6() -> Path | None:
     """libmf6 from $SWATPLUS_TEST_LIBMF6, else common install folders, else None."""
     def exists(p: Path) -> bool:

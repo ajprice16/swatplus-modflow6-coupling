@@ -21,6 +21,8 @@ from swatplus_modflow.builders.spec import load_spec  # noqa: E402
 from swatplus_modflow.cli import main  # noqa: E402
 
 LIB = fx.find_libmf6()
+if LIB is None and fx.LIB_REQUIRED:      # CI sets this so a missing library fails instead of skipping
+    raise RuntimeError("SWATPLUS_REQUIRE_LIBMF6 is set but no libmf6 was found")
 
 
 def _pipeline(root: Path, capsys):

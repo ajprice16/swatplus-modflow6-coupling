@@ -28,9 +28,10 @@ physics.
 
 ## Live vs facade API
 
-- Documented library entry: `SWATPlusMODFLOWCoupler` (and supporting modules).
-- Daily in-memory coupling via libmf6/XMI (`ModflowBMIInterface`) is the
-  preferred driver; CLIs must remain path-parameterized.
+- Documented entry point: the daily libmf6 engine, `swatplus-modflow run project.yaml`
+  (`swatplus_modflow/engine/`). `SWATPlusMODFLOWCoupler` is a deprecated facade whose
+  file-based MODFLOW interface raises (it cannot apply daily forcing).
+- CLIs must remain path-parameterized.
 - Code promoted from an application project must have every study default
   (model names, gauge IDs, output dir names, paths) removed before merging.
 

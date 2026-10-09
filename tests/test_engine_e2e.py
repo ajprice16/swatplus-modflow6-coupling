@@ -20,6 +20,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 import engine_fixtures as fx  # noqa: E402
 
 LIB = fx.find_libmf6()
+if LIB is None and fx.LIB_REQUIRED:      # CI sets this so a missing library fails instead of skipping
+    raise RuntimeError("SWATPLUS_REQUIRE_LIBMF6 is set but no libmf6 was found")
 pytestmark = pytest.mark.skipif(LIB is None, reason="libmf6 not found (SWATPLUS_TEST_LIBMF6)")
 pytest.importorskip("xmipy")
 pytest.importorskip("flopy")
@@ -297,6 +299,21 @@ def test_water_table_recharge_goes_to_a_wet_cell(tmp_path, capsys):
     """With layer-1 heads below the layer-1 bottom, recharge must be placed in layer 2."""
     # layer 1 bottom is 10 m, so heads of 8 m leave layer 1 dry
     fx.write_head_file(tmp_path / "dry.hds", [np.full((6, 8), 8.0), np.full((6, 8), 6.0)])
+    from swatplus_modflow.engine import driver as drv
+    seen = []
+    real = drv._water_table_nodes
+    drv._water_table_nodes = lambda red, h, b: (seen.append((red.copy(), real(red, h, b))) or seen[-1][1])
+    try:
+        _water_table_run(tmp_path, capsys)
+    finally:
+        drv._water_table_nodes = real
+    assert seen, "water-table rule was never evaluated"
+    red, sel = seen[0]
+    act = red[1] > 0
+    assert (sel[act] == red[1][act]).all()                 # every column's recharge goes to layer 2 (layer 1 is dry)
+
+
+def _water_table_run(tmp_path, capsys):
     for flag in (True, False):
         root = tmp_path / str(flag)
         p = fx.make_project(root, LIB, n_days=3, coupling={"recharge_to_water_table": flag},

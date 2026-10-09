@@ -1,126 +1,110 @@
-# Architecture Overview
+# Architecture
 
-## System Design
+## Live architecture: the daily libmf6 driver
 
-The SWAT+ - MODFLOW 6 coupling framework implements a daily-timestep master-slave architecture where SWAT+ controls the main simulation loop and MODFLOW 6 is called as a subroutine for groundwater processes.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Daily Timestep Simulation                                  │
-└─────────────────────────────────────────────────────────────┘
-    │
-    ├─ Day Initialization
-    │
-    ├─► SWAT+ Simulation (advance one day)
-    │   ├─ HRU soil water balance
-    │   ├─ Calculate deep percolation (recharge)
-    │   ├─ Calculate unsatisfied ET
-    │   ├─ Route surface runoff through channels
-    │   ├─ Determine irrigation demand
-    │   └─ Generate channel discharge
-    │
-    ├─► Flux Mapping (SWAT+ → MODFLOW)
-    │   ├─ Translate HRU recharge → cell recharge rates
-    │   ├─ Translate unsatisfied ET → cell ET limits
-    │   ├─ Translate irrigation demand → well pumping rates
-    │   └─ Map channel stage to river package stage
-    │
-    ├─► MODFLOW 6 Simulation
-    │   ├─ Update boundary conditions (RCH, EVT, WEL, RIV packages)
-    │   ├─ Run groundwater flow solver
-    │   ├─ Calculate heads and cell-by-cell flows
-    │   └─ Extract exchange rates (channels, drains, etc)
-    │
-    ├─► Flux Mapping (MODFLOW → SWAT+)
-    │   ├─ Aggregate cell exchange → channel baseflow
-    │   ├─ Extract groundwater contribution to channels
-    │   ├─ Extract drain discharge to channels
-    │   └─ Update soil saturation from water table
-    │
-    ├─► SWAT+ Feedback Update
-    │   ├─ Add baseflow to channel routing
-    │   ├─ Update soil saturation
-    │   ├─ Update aquifer storage
-    │   └─ Complete routing calculations
-    │
-    ├─► State Tracking
-    │   ├─ Save groundwater heads
-    │   ├─ Track water balance
-    │   └─ Update domain state
-    │
-    └─► Next Day
+The supported way to run a coupled model is the command-line engine
+(`swatplus-modflow run project.yaml`, implemented in `swatplus_modflow/engine/`).
+SWAT+ runs first and writes daily output; MODFLOW 6 is then advanced **one day at a time
+through libmf6 (the XMI interface)** with SWAT+ forcing written into MODFLOW memory. Nothing
+is written to MODFLOW input files between days.
 
 ```
-
-## Key Components
-
-### 1. Simulator (`core/simulator.py`)
-- Main orchestrator class `SWATPlusMODFLOWCoupler`
-- Manages timestep iteration
-- Coordinates model interfaces
-- Handles I/O and results
-
-### 2. Model Interfaces
-- **SWATPlusInterface** (`interfaces/swatplus_interface.py`): Manages SWAT+ binary execution and I/O
-- **MODFLOWInterface** (`interfaces/modflow_interface.py`): Manages MODFLOW 6 via FloPy
-
-### 3. Coupling Logic
-- **GeographicMapper** (`coupling/geographic_mapper.py`): Maps HRUs/channels to MODFLOW cells
-- **FluxTranslator** (`coupling/flux_translator.py`): Converts variables between model domains
-
-### 4. Supporting Modules
-- **TimestepManager**: Handles daily iteration
-- **SimulationState**: Tracks state variables
-- **WaterBalanceTracker**: Maintains water balance
-- **CouplingConfig**: Manages configuration
-
-## Data Flow
-
-### SWAT+ → MODFLOW Translation
-
-```
-SWAT+ Output            Translation              MODFLOW Input
-──────────────────────  ───────────────────────  ──────────────
-HRU Recharge (mm)  ──►  Weight by fraction   ──►  RCH: cell rates
-                        Convert units             (m³/day)
-                        Apply delay function
-
-Unsatisfied ET (mm) ──► Weight by fraction   ──►  EVT: max rates
-                        Apply extinction depth
-                        Convert units
-
-Irrigation Demand  ──►  Sum across cells     ──►  WEL: pumping
-(m³/day)                               rates
-
-Channel Stage (m)  ──►  Map 1:1 to cells    ──►  RIV: stage
+project.yaml ──► validate ──► prepare inputs ──► working copy of the MODFLOW folder ──► daily loop ──► outputs
+                               │                  (TDIS = n one-day periods, IMS from        │
+                               │                   the project, STO transient, OC prints     │
+                               │                   the budget each step)                     │
+                               ├─ hru.con areas, hru_wb_day perc  (mm/day)                   │
+                               ├─ channel_sd_day flo_out, seep    (m3/s, m3)                 │
+                               └─ chandeg.con / reservoir.con topology                       │
+                                                                                             ▼
+   for each day:  prepare_time_step → write SFR RUNOFF (m3/day) and RCHA RECHARGE (m/day) [+ EVT, WEL scaling]
+                  → solve (outer iterations) → read the listing budget → check → ledger row
 ```
 
-### MODFLOW → SWAT+ Translation
+Why a daily step: monthly stress periods average a storm pulse below the stream network's
+infiltration capacity, so stage dynamics on the timescale of the storm are lost.
 
-```
-MODFLOW Output          Translation              SWAT+ Input
-──────────────────────  ───────────────────────  ──────────────
-Cell Heads (m)     ──►  Check water table   ──►  Soil saturation
-                        Extract saturation
-                        Weight by fraction
+### Modules
 
-Exchange Rates    ──►   Aggregate by channel ──► Baseflow
-(m³/day)               Sum cell contributions    to channels
-```
+| module | role |
+|---|---|
+| `engine/swat_io.py` | SWAT+ readers; columns are found by header name, units from the units line, ids from `unit` |
+| `engine/connections_io.py` | `hru_cells.csv`, `sfr_reaches.csv`, `well_cells.csv` readers and checks |
+| `engine/forcing.py` | recharge delay, `daily`/`monthly`/`monthly_ramped` schedules, SFR runoff from channel flows |
+| `engine/transmission.py` | optional Lane-style channel transmission loss |
+| `engine/mf6_prepare.py` | inspects the MODFLOW folder and writes the daily working copy (the user's folder is never modified) |
+| `engine/driver.py` | the libmf6 loop, pointers, invariants, ledger, outputs |
+| `engine/budget.py` | parses MODFLOW 6's per-step volume budget from the listing file |
+| `engine/validate.py`, `engine/runner.py` | `validate` and `run`, run manifest |
+| `builders/` | `build-modflow` (build spec -> MODFLOW 6 model) and `build-connections` (GIS -> contract tables) |
+| `cli.py`, `__main__.py` | `swatplus-modflow version | validate | run | build-modflow | build-connections` |
 
-## Geographic Connectivity
+The file formats exchanged with a GIS front end (project file, grid, `hru_cells.csv`,
+`channel_cells.csv`, `sfr_reaches.csv`, run manifest, command line and exit codes) are in
+[DATA_CONTRACTS.md](DATA_CONTRACTS.md).
 
-Connections between SWAT+ objects and MODFLOW cells are established through GIS intersection:
+### Units and indexing
 
-- **HRU ↔ Cell**: Fractional area overlap
-- **Channel ↔ Cell**: Length of channel within cell
-- **Reservoir ↔ Cell**: Point or area intersection
-- **Canal ↔ Cell**: Length of canal within cell
-- **Drain ↔ Cell**: 1-to-1 mapping
+* SWAT+ percolation is mm/day over the **`hru.con` area**; the engine converts it to a depth rate
+  (m/day) over each cell: `rate = perc_mm * 1e-3 * area_hru_con * fraction / cell_area`.
+  Volumes are m3/day throughout. A polygon area that differs from `hru.con` by more than 5% is warned.
+* MODFLOW 6 recharge (`RCHA`) is a depth rate applied over the cell area; cell-budget flows are m3/day,
+  negative out of the cell. The engine asserts `LENGTH_UNITS METERS` and `TIME_UNITS DAYS` before the
+  run (SFR uses `LENGTH_CONVERSION 1.0` and `TIME_CONVERSION 86400.0`).
+* Files use 1-based `layer,row,col`; internal arrays are 0-based. Every index is range-checked.
+* Reach numbers (`rno`) in `sfr_reaches.csv` start at 1, as in the SFR input file.
 
-This information is stored in a shapefile or geopackage and loaded at simulation start.
+### Forcing
 
-## Coupling Parameters
+* **SFR runoff.** Each channel's local flow (`flo_out` minus the `flo_out` of the nearest upstream
+  channels that have output) is spread over its reaches by length. SWAT+ `seep` (its own
+  channel-to-aquifer loss) is added back, because the SFR streambed carries all channel-aquifer exchange.
+  Evaporation and storage change stay as negative runoff, which MODFLOW caps at the available flow.
+  A reservoir is a graph node without output, so the channel below it receives `flo_out` minus the flow of the
+  channels feeding the reservoir. Channels without an SFR reach are not injected; the net volume is reported.
+* **Recharge.** Optional vadose delay (below), then `daily`, `monthly` (month mean held for the month) or
+  `monthly_ramped` (linear between month midpoints, per-cell rescaled so the month volume is exact).
+  With `recharge_to_water_table` the highest wet active cell of each column receives it (re-evaluated at each
+  month start, daily in `daily` mode); a column with no active cell is reported as `recharge_outside_active_cells_m3`.
+* **Wells, ET.** `pumping_scale` multiplies every WEL package (and the optional `well_cells` table, added as
+  an extra package). `et_extinction_depth_m` and the optional `evt_monthly_factors` act on the EVT package.
+  No seasonal table is built in.
+* **Transmission loss (optional).** The Lane loss on a channel's local flow is removed from SFR runoff and added
+  to recharge in the reach cells, so water is moved, not created. Which channels lose is a judgment call: those
+  whose streambed bottom lies above the initial head in most reaches.
+* **Spin-up.** `period.spinup_days` days before `start` are run and checked, but not written.
+
+### Invariants checked every step (`checks.*`)
+
+1. MODFLOW converged (`allow_nonconvergence_steps` days tolerated).
+2. The model's own **percent discrepancy** (from the listing budget) is within `mass_balance_tolerance_percent`.
+3. The SFR runoff in MODFLOW memory equals the SWAT+-derived volume (m3/day); positive runoff MODFLOW applied
+   equals what was injected.
+4. The recharge MODFLOW reports receiving equals the volume intended for cells with an active node.
+5. The budget printed belongs to the day just stepped (stress period = day index + 1).
+
+With `enforce_invariants: true` a failure stops the run (exit code 2, manifest `status: failed`, partial ledger
+`<prefix>daily_summary_partial.csv`). Every day's ledger row is in `<prefix>daily_summary.csv`.
+`utils/water_budget.WaterBudgetTracker` receives each day's budget and is validated at the end of the run.
+
+### Zone precedence in the MODFLOW builder
+
+Hydraulic zones carry a unique integer `priority`; where zones overlap the larger one wins, and each property
+(`k`, `k33_over_k`, `sy`, `ss`) is resolved separately from the zones that set it. `zone_report.csv` states, per
+zone and property, cells in geometry / set / lost (and to which zone) / taken over from lower priorities. A zone
+that takes over cells from others and covers more than `max_zone_share_percent` of the active cells is an error
+(or a warning with `on_dominant: warn`). This replaces a fixed drawing order in which a large regional class drawn last
+could cover every cell and silently make K uniform.
+
+## Legacy facade (deprecated)
+
+`SWATPlusMODFLOWCoupler` (`core/simulator.py`) with the FloPy `MODFLOWInterface` is the earlier file-based design.
+`MODFLOWInterface.advance_one_day` changed in-memory FloPy objects and then ran `mf6` on the unchanged files on disk,
+so the original model was solved every day while plausible-looking heads came back (DEFECT-38). It now raises
+`FileBasedCouplingNotSupported`, and constructing the coupler emits a `DeprecationWarning`. The translation modules
+(`coupling/`) and the invariant checks (`utils/coupling_invariants.py`) remain available as library code.
+
+## Coupling parameters
 
 ### Recharge Delay (Vadose Zone Transfer Function)
 
@@ -150,39 +134,29 @@ at δ=10 and 4.9% at δ=20.
 
 ### ET Extinction Depth
 
-ET from saturated zone only occurs where water table is within extinction depth of surface.
-
-### Water Balance
-
-Daily water balance maintained at cell scale:
-```
-ΔStorage = Recharge + ChannelSeepage + CanalSeepage - Pumping - ET - Discharge
-```
+ET from the saturated zone only occurs where the water table is within the extinction depth of the surface
+(the EVT package's own `DEPTH`, or `coupling.et_extinction_depth_m` when set).
 
 ## Output Structure
 
 ```
-results/
-├── coupled_daily_summary.csv         # Daily watershed totals
-├── coupled_cell_fluxes_2020_01.csv   # Cell-by-cell monthly flux details
-├── coupled_heads_2020_01.csv         # Cell head time series
-├── coupled_water_balance.txt         # Water balance report
-└── coupled_state.h5                  # HDF5 with spatial state arrays
+<output.directory>/
+├── run_manifest.json                 # lists every file below (docs/DATA_CONTRACTS.md section 6)
+├── <prefix>daily_summary.csv         # daily basin totals and the injection ledger (m3/day)
+├── <prefix>budget_terms.csv          # MODFLOW budget terms per day, in/out (m3/day)
+├── <prefix>final_heads.csv           # layer,row,col,value at the last step
+├── <prefix>heads.csv                 # date,layer,row,col,value at each month end and the last day
+├── <prefix>reach_outflow.csv, <prefix>reach_gw_exchange.csv   # optional (output.save_reach_flows)
+└── mf6_work/                         # the working copy of the MODFLOW simulation (listing file, inputs)
 ```
 
-## Performance Considerations
+## Limitations
 
-- **Computational Cost**: MODFLOW typically adds 100-250% to SWAT+ runtime
-- **Convergence**: Daily timesteps require stable initial conditions
-- **Grid Size**: Typical MODFLOW models: 50-500 x 50-500 cells
-- **Memory**: State tracking scales with #cells × #timesteps
-
-## Limitations & Future Work
-
-1. **Single-Layer**: Currently unconfined aquifer only
-2. **Vadose Zone**: Uses transfer function, not physically-based UZF
-3. **Channels**: Uniform stage across reach
-4. **Nutrient Transport**: RT3D coupling development ongoing
-5. **GPU**: Not yet implemented
-
-See main README for roadmap and development status.
+1. Structured (DIS) grids with one GWF model; DISV/DISU and multi-model simulations are refused.
+2. The model must define stress data for period 1 only; the engine carries it to every day.
+3. Recharge needs an array-based package (`RCH` with `READASARRAYS`).
+4. The vadose zone is a transfer function, not a physically based UZF.
+5. SWAT+ is not fed back from MODFLOW heads or exchange in the daily engine; coupling is sequential
+   (SWAT+ first, then MODFLOW).
+6. The SWAT+ output layout was implemented from the file headers; it has not been exercised against a live SWAT+
+   run in this repository's tests (the tests use synthetic files in the same layout).
