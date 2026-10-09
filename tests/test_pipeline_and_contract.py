@@ -14,10 +14,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 import build_fixtures as bf  # noqa: E402
 import engine_fixtures as fx  # noqa: E402
 
-from swatplus_modflow.build.grid import read_grid  # noqa: E402
-from swatplus_modflow.build.modflow_builder import build_modflow  # noqa: E402
-from swatplus_modflow.build.sfr import build_sfr  # noqa: E402
-from swatplus_modflow.build.spec import load_spec  # noqa: E402
+from swatplus_modflow.builders.grid import read_grid  # noqa: E402
+from swatplus_modflow.builders.modflow_builder import build_modflow  # noqa: E402
+from swatplus_modflow.builders.sfr import build_sfr  # noqa: E402
+from swatplus_modflow.builders.spec import load_spec  # noqa: E402
 from swatplus_modflow.cli import main  # noqa: E402
 
 LIB = fx.find_libmf6()
@@ -116,7 +116,7 @@ def test_project_schema_additions_are_optional():
 # ---------------------------------------------------------------- contract clarifications
 
 def test_repeated_channel_cell_pieces_are_accepted():
-    from swatplus_modflow.build.grid import Grid
+    from swatplus_modflow.builders.grid import Grid
     g = Grid(bf.CRS, bf.X0, bf.Y0, bf.CELL, bf.CELL, bf.NROW, bf.NCOL)
     # the channel leaves cell (2,3) and re-enters it: same (channel_id, row, col), different seq
     cells = pd.DataFrame({"channel_id": [1, 1, 1], "seq": [1, 2, 3], "layer": 1, "row": [2, 3, 2],
@@ -131,7 +131,7 @@ def test_repeated_channel_cell_pieces_are_accepted():
 
 
 def test_channel_fractions_below_one_warn_and_are_not_rescaled():
-    from swatplus_modflow.build.grid import Grid
+    from swatplus_modflow.builders.grid import Grid
     g = Grid(bf.CRS, bf.X0, bf.Y0, bf.CELL, bf.CELL, bf.NROW, bf.NCOL)
     cells = pd.DataFrame({"channel_id": [1, 1], "seq": [1, 2], "layer": 1, "row": [2, 3], "col": [3, 3],
                           "length_m": [50.0, 50.0], "fraction": [0.3, 0.3]})
@@ -192,7 +192,7 @@ def test_committed_project_schema_matches_the_models():
 
 def test_build_example_loads_against_its_schema_shape(tmp_path):
     """build.example.yaml parses (paths are placeholders; only the structure is validated)."""
-    from swatplus_modflow.build.spec import BuildSpec
+    from swatplus_modflow.builders.spec import BuildSpec
     data = yaml.safe_load((Path(__file__).resolve().parents[1] / "build.example.yaml").read_text())
     spec = BuildSpec.model_validate(data, context={"base_dir": tmp_path})
     assert spec.build_version == 1 and spec.properties.zones and spec.sfr is not None

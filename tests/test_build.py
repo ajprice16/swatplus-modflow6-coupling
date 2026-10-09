@@ -12,12 +12,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 import build_fixtures as bf  # noqa: E402
 
-from swatplus_modflow.build import connections as bc  # noqa: E402
-from swatplus_modflow.build import zones as zn  # noqa: E402
-from swatplus_modflow.build.grid import BuildInputError, read_grid  # noqa: E402
-from swatplus_modflow.build.modflow_builder import build_modflow  # noqa: E402
-from swatplus_modflow.build.sfr import build_sfr, downstream_from_topology  # noqa: E402
-from swatplus_modflow.build.spec import load_spec  # noqa: E402
+from swatplus_modflow.builders import connections as bc  # noqa: E402
+from swatplus_modflow.builders import zones as zn  # noqa: E402
+from swatplus_modflow.builders.grid import BuildInputError, read_grid  # noqa: E402
+from swatplus_modflow.builders.modflow_builder import build_modflow  # noqa: E402
+from swatplus_modflow.builders.sfr import build_sfr, downstream_from_topology  # noqa: E402
+from swatplus_modflow.builders.spec import load_spec  # noqa: E402
 from swatplus_modflow.cli import main  # noqa: E402
 
 
@@ -265,7 +265,7 @@ def test_connection_cli_writes_contract_files(tmp_path, capsys):
 # ---------------------------------------------------------------- SFR
 
 def test_sfr_topology_numbering_and_connections():
-    from swatplus_modflow.build.grid import Grid
+    from swatplus_modflow.builders.grid import Grid
     g = Grid(bf.CRS, bf.X0, bf.Y0, bf.CELL, bf.CELL, bf.NROW, bf.NCOL)
     cells = pd.DataFrame({
         "channel_id": [5, 5, 5, 2, 2], "seq": [1, 2, 3, 1, 2], "layer": 1,
@@ -297,7 +297,7 @@ def test_downstream_through_reservoir():
 
 
 def test_inactive_channel_pieces_are_dropped_and_reported():
-    from swatplus_modflow.build.grid import Grid
+    from swatplus_modflow.builders.grid import Grid
     g = Grid(bf.CRS, bf.X0, bf.Y0, bf.CELL, bf.CELL, bf.NROW, bf.NCOL)
     cells = pd.DataFrame({"channel_id": [1, 1], "seq": [1, 2], "layer": 1, "row": [1, 2], "col": [1, 1],
                           "length_m": [50.0, 50.0]})
