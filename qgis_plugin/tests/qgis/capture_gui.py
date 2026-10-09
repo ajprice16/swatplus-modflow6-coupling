@@ -37,13 +37,30 @@ def _tag(qgis_version: str, qt_version: str) -> str:
     return f"qgis-{v}_qt{qt_version}_{sysname}"
 
 
-def _layout_problems(widget):
-    """Simple checks that catch most Qt5/Qt6 layout regressions."""
+def _widest_children(widget, n=3):
+    """The descendants whose minimum width comes closest to the window's: what makes it wide."""
+    from qgis.PyQt.QtWidgets import QWidget
+    rows = []
+    for c in widget.findChildren(QWidget):
+        w = c.minimumSizeHint().width()
+        text = c.text() if hasattr(c, "text") and callable(c.text) else ""
+        rows.append((w, f"{type(c).__name__}{'#' + c.objectName() if c.objectName() else ''}"
+                        f"{' ' + repr(str(text)[:50]) if text else ''} min width {w}"))
+    rows.sort(key=lambda r: -r[0])
+    return [r[1] for r in rows[:n]]
+
+
+def _layout_problems(widget, text_checks=True):
+    """Simple checks that catch most Qt5/Qt6 layout regressions. ``text_checks`` is off for
+    Processing dialogs, whose buttons and labels belong to QGIS itself."""
     from qgis.PyQt.QtWidgets import QAbstractButton, QLabel
     problems = []
     hint = widget.minimumSizeHint()
     if hint.width() > SCREEN[0] or hint.height() > SCREEN[1]:
-        problems.append(f"minimum size {hint.width()}x{hint.height()} exceeds a {SCREEN[0]}x{SCREEN[1]} screen")
+        problems.append(f"minimum size {hint.width()}x{hint.height()} exceeds a {SCREEN[0]}x{SCREEN[1]} screen; "
+                        f"widest parts: {'; '.join(_widest_children(widget))}")
+    if not text_checks:
+        return problems
     for b in widget.findChildren(QAbstractButton):
         if b.isVisible() and b.text() and b.width() < b.fontMetrics().horizontalAdvance(b.text().replace("&", "")):
             problems.append(f"button text clipped: {b.text()!r}")
@@ -53,7 +70,7 @@ def _layout_problems(widget):
     return problems
 
 
-def _grab(widget, path: Path, size=None):
+def _grab(widget, path: Path, size=None, text_checks=True):
     from qgis.PyQt.QtWidgets import QApplication
     if size:
         widget.resize(*size)
@@ -63,7 +80,7 @@ def _grab(widget, path: Path, size=None):
     pix = widget.grab()
     ok = pix.save(str(path))
     rec = {"file": path.name, "width": pix.width(), "height": pix.height(), "saved": bool(ok),
-           "problems": _layout_problems(widget)}
+           "problems": _layout_problems(widget, text_checks)}
     if widget.property("missing_widgets"):
         rec["problems"].append(f"no standard Processing widget for: {widget.property('missing_widgets')}")
     widget.hide()
@@ -77,6 +94,9 @@ def _install_iface(iface):
     iface.mapCanvas = lambda: iface.canvas
     iface.messageBar = lambda: iface.bar
     iface.activeLayer = lambda: None
+    from qgis.gui import QgsBrowserGuiModel
+    iface.browser = QgsBrowserGuiModel()
+    iface.browserModel = lambda: iface.browser
     import qgis.utils
     qgis.utils.iface = iface
     import processing.tools.general  # noqa: F401  (createAlgorithmDialog lives here in 3.x and 4.x)
@@ -127,14 +147,15 @@ def capture_one_algorithm(alg: str, out: Path, mode: str = "dialog") -> int:
     from qgis import processing
     if mode == "panel":
         name = f"processing_{alg}_params"
-        rec = dict(status="ok", **_grab(_parameter_panel(f"swatplusmodflow:{alg}"), out / f"{name}.png"))
+        rec = dict(status="ok", **_grab(_parameter_panel(f"swatplusmodflow:{alg}"), out / f"{name}.png",
+                                        text_checks=False))
         (out / f".{name}.json").write_text(json.dumps(rec))
         return 0
     name = f"processing_{alg}"
     dlg = processing.createAlgorithmDialog(f"swatplusmodflow:{alg}", {})
     if dlg is None:
         raise RuntimeError("createAlgorithmDialog returned None")
-    rec = dict(status="ok", **_grab(dlg, out / f"{name}.png", (760, 620)))
+    rec = dict(status="ok", **_grab(dlg, out / f"{name}.png", (760, 620), text_checks=False))
     (out / f".{name}.json").write_text(json.dumps(rec))
     return 0
 

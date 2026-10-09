@@ -152,10 +152,15 @@ def rect_domain(crs=CRS):
     return lyr
 
 
+_grid_counter = __import__("itertools").count(1)
+
+
 def grid_layer_from_alg(workdir, domain=None, size=D, buffer_=0.0):
     """Run 'Create MODFLOW grid' (default: on the rectangle) and return (gpkg layer, grid.json path)."""
     domain = domain or rect_domain()
-    gpkg, js = str(Path(workdir) / "grid.gpkg"), str(Path(workdir) / "grid.json")
+    # a fresh name per call: on Windows a grid layer that is still open locks its file
+    stem = f"grid_{next(_grid_counter)}"
+    gpkg, js = str(Path(workdir) / f"{stem}.gpkg"), str(Path(workdir) / f"{stem}.json")
     out = run_alg("swatplusmodflow:creategrid", {"DOMAIN": domain, "CELL_SIZE": size, "BUFFER": buffer_, "SNAP": True,
                                                  "OUTPUT_GRID": gpkg, "OUTPUT_JSON": js})
     lyr = QgsVectorLayer(out["OUTPUT_GRID"], "grid", "ogr")

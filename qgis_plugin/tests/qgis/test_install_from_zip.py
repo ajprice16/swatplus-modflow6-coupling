@@ -24,7 +24,7 @@ class TestInstallFromZip(unittest.TestCase):
     def test_zip_installs_and_loads_in_profile(self):
         profile = Path(QgsApplication.qgisSettingsDirPath())            # the temporary profile of this run
         self.assertTrue(str(profile).startswith(tempfile.gettempdir()) or "swatplus_qgis_test_profile" in str(profile), profile)
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             archive = build_plugin_zip.build(Path(td))
             plugins_dir = profile / "python" / "plugins"
             plugins_dir.mkdir(parents=True, exist_ok=True)

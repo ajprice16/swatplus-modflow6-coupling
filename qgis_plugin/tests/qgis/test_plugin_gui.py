@@ -90,7 +90,7 @@ class TestPluginLifecycle(unittest.TestCase):
 
 class TestEngineProcess(unittest.TestCase):
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory(prefix="swatplus_qgis_")
+        self._tmp = tempfile.TemporaryDirectory(prefix="swatplus_qgis_", ignore_cleanup_errors=True)
         self.dir = Path(self._tmp.name)
 
     def tearDown(self):
@@ -176,7 +176,7 @@ class TestEngineProcess(unittest.TestCase):
 class TestRunDialogAndResults(unittest.TestCase):
     def setUp(self):
         E.register_provider()
-        self._tmp = tempfile.TemporaryDirectory(prefix="swatplus_qgis_")
+        self._tmp = tempfile.TemporaryDirectory(prefix="swatplus_qgis_", ignore_cleanup_errors=True)
         self.dir = Path(self._tmp.name)
         settings.set_value(eng.SETTINGS_PYTHON_KEY, ENGINE_PYTHON)
         self.project = QgsProject()

@@ -56,6 +56,7 @@ class RunDialog(QDialog):
         self.use_form.setChecked(True)
         top.addRow(self.use_form)
         self.engine_label = QLabel()
+        self.engine_label.setWordWrap(True)   # long interpreter paths must not widen the dialog
         top.addRow("Engine interpreter", self.engine_label)
         root.addLayout(top)
 

@@ -22,7 +22,7 @@ def _rows(path):
 
 class AlgorithmTestCase(unittest.TestCase):
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory(prefix="swatplus_qgis_")
+        self._tmp = tempfile.TemporaryDirectory(prefix="swatplus_qgis_", ignore_cleanup_errors=True)
         self.dir = Path(self._tmp.name)
 
     def tearDown(self):

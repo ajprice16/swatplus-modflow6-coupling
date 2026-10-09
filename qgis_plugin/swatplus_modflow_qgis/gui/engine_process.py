@@ -5,6 +5,8 @@ documented stdout lines (PROGRESS / RESULT, docs/DATA_CONTRACTS.md section 5).
 """
 from __future__ import annotations
 
+import os
+import subprocess
 from typing import List, Optional, Tuple
 
 from qgis.PyQt.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, pyqtSignal
@@ -12,6 +14,18 @@ from qgis.PyQt.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, pyq
 from ..core import engine as eng
 
 KILL_GRACE_MS = 5000
+
+
+def _kill_tree_windows(proc) -> None:
+    pid = int(proc.processId() or 0)
+    if pid:
+        try:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True, timeout=15,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except (OSError, subprocess.SubprocessError):
+            pass
+    if proc.state() != QProcess.ProcessState.NotRunning:
+        proc.kill()
 
 
 class EngineProcess(QObject):
@@ -66,6 +80,11 @@ class EngineProcess(QObject):
             return
         self._cancelled = True
         proc = self._proc
+        if os.name == "nt":
+            # QProcess.terminate() only posts WM_CLOSE, which console programs ignore, so on
+            # Windows the engine and anything it started (SWAT+) are ended as a process tree.
+            _kill_tree_windows(proc)
+            return
         proc.terminate()
         QTimer.singleShot(KILL_GRACE_MS, lambda: proc.kill() if proc.state() != QProcess.ProcessState.NotRunning else None)
 
