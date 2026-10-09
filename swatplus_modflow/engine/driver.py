@@ -179,9 +179,14 @@ def prepare_inputs(cfg: ProjectConfig) -> Prepared:
         geo = swat_io.read_channel_geometry(txt)
         trans = dict(losing=None, len_km={c: geo[c][0] for c in geo}, wd_m={c: geo[c][1] for c in geo},
                      k_in_per_h=tl.k_mm_per_h / 25.4, duration_h=tl.duration_h)
+    ingrid = None
+    if cfg.connections.channel_cells is not None:
+        cc = pd.read_csv(cfg.connections.channel_cells)
+        if {"channel_id", "fraction"} <= set(cc.columns):
+            ingrid = {int(c): float(f) for c, f in cc.groupby("channel_id")["fraction"].sum().items()}
     return Prepared(cfg, info, sim_start, n_days, dates, hc, reaches, wells, hru_ids, hru_area, perc,
                     _RunoffInputs(flow, seep, present_ids, reaches.reaches_by_channel(), upstream_of,
-                                  reaches.n, trans), notes)
+                                  reaches.n, trans, ingrid), notes)
 
 
 @dataclass
@@ -195,13 +200,15 @@ class _RunoffInputs:
     upstream_of: dict
     n_reaches: int
     trans: Optional[dict]
+    ingrid_fraction: Optional[Dict[int, float]] = None
 
     def build(self, losing: Optional[set]) -> forcing.RunoffResult:
         trans = None
         if self.trans is not None:
             trans = dict(self.trans, losing=losing or set())
         return forcing.build_runoff(self.flow, self.seep, self.channel_ids, self.chan_reaches,
-                                    self.upstream_of, self.n_reaches, trans=trans)
+                                    self.upstream_of, self.n_reaches, trans=trans,
+                                    ingrid_fraction=self.ingrid_fraction)
 
 
 # ------------------------------------------------------------------ MODFLOW access
@@ -378,6 +385,17 @@ def run_daily(prep: Prepared, work_dir: Path, *, progress: Callable[[int, int, d
                    f"{runoff_res.unmapped_m3:,.0f} m3 over the run that is not injected")
             log.warning(msg)
             prep.notes.append(msg)
+        offgrid_ro = runoff_res.offgrid_reassigned_m3d
+        if offgrid_ro is None:
+            prep.notes.append("Channel flow from channel length outside the grid is injected into the "
+                              "channel's in-grid reaches; its volume is not reported because "
+                              "connections.channel_cells is not set")
+        elif np.any(offgrid_ro != 0.0):
+            msg = (f"{float(offgrid_ro.sum()):,.0f} m3 of net channel flow over the run belongs to channel "
+                   "length outside the grid and was injected into the same channels' in-grid reaches "
+                   "(daily column runoff_from_offgrid_length_m3)")
+            log.warning(msg)
+            prep.notes.append(msg)
         # ---- recharge weights
         W, col_layer = forcing.build_weights(prep.hru_ids, prep.hru_cells, prep.hru_area_m2,
                                              cell_area, nrow, ncol)
@@ -542,6 +560,8 @@ def run_daily(prep: Prepared, work_dir: Path, *, progress: Callable[[int, int, d
                 transmission_loss_m3=tl_m3, runoff_intended_m3=want_ro, runoff_injected_m3=inj,
                 runoff_applied_m3=float(applied_ro.sum()),
                 runoff_capped_m3=want_ro - float(applied_ro.sum()),
+                runoff_from_offgrid_length_m3=(float(offgrid_ro[i]) if offgrid_ro is not None
+                                               else float("nan")),
                 wel_requested_m3=wel_req, outer_iterations=kiter, converged=bool(converged))
             if chk.enforce_invariants and abs(pos_in - pos_app) > max(pos_in, ABS_FLOOR_M3) * tol / 100.0:
                 raise CouplingInvariantError(

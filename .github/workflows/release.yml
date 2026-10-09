@@ -1,0 +1,38 @@
+name: release
+
+# Pushing a tag such as v0.1.0 builds the QGIS plugin zip and the Python package and attaches them to a
+# GitHub pre-release. Distribution is through GitHub only.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check the tag matches the plugin and package versions
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          plugin=$(sed -n 's/^version=//p' qgis_plugin/swatplus_modflow_qgis/metadata.txt)
+          package=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          module=$(python -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('swatplus_modflow/__init__.py').read()).group(1))")
+          echo "tag=$tag plugin=$plugin package=$package module=$module"
+          if [ "$tag" != "$plugin" ] || [ "$tag" != "$package" ] || [ "$tag" != "$module" ]; then
+            echo "Tag and versions disagree" >&2; exit 1
+          fi
+      - name: Build QGIS plugin zip
+        run: python qgis_plugin/build_plugin_zip.py --out dist
+      - name: Build Python package
+        run: python -m pip install build && python -m build --outdir dist
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes --prerelease

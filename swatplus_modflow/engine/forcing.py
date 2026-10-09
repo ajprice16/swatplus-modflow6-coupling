@@ -159,11 +159,16 @@ class RunoffResult:
     loss_reach_m3d: Optional[np.ndarray]   # (n_days, n_reaches) transmission loss, or None
     unmapped_m3: float              # net local flow of SWAT+ channels without a reach (not injected)
     seep_added_m3: float
+    # (n_days,) share of the injected runoff that belongs to the length of channels lying
+    # OUTSIDE the grid; it is injected into the same channel's in-grid reaches. None when the
+    # in-grid fractions are unknown (no connections.channel_cells).
+    offgrid_reassigned_m3d: Optional[np.ndarray] = None
 
 
 def build_runoff(flow_m3s: np.ndarray, seep_m3d: Optional[np.ndarray], channel_ids: Sequence[int],
                  chan_reaches: Dict[int, List[Tuple[int, float]]], upstream_of: Dict[int, List[int]],
-                 n_reaches: int, *, trans: Optional[dict] = None) -> RunoffResult:
+                 n_reaches: int, *, trans: Optional[dict] = None,
+                 ingrid_fraction: Optional[Dict[int, float]] = None) -> RunoffResult:
     """Each channel's local flow, spread over its reaches by length, as SFR RUNOFF (m3/day).
 
     ``local = flo_out - sum(flo_out of the nearest upstream channels with output)``. SWAT+
@@ -175,6 +180,13 @@ def build_runoff(flow_m3s: np.ndarray, seep_m3d: Optional[np.ndarray], channel_i
     ``trans`` (optional) = dict(losing=set of channel ids, len_km={ch: km}, wd_m={ch: m},
     k_in_per_h=float, duration_h=float). For losing channels the positive local flow is
     reduced by the Lane loss, returned per reach so the caller can add it to recharge.
+
+    Channels partly outside the grid: the whole local flow of a channel is spread over its
+    in-grid reaches (shares from sfr_reaches.csv sum to 1), so SWAT+ channel water is
+    conserved. This is a deliberate modelling choice -- unlike HRU percolation outside the
+    grid, which leaves the model. When ``ingrid_fraction`` ({channel_id: in-grid length
+    fraction from channel_cells.csv}) is given, the part attributable to the off-grid length,
+    ``q * (1 - f)``, is reported per day in ``offgrid_reassigned_m3d``.
     """
     from . import transmission as lane
 
@@ -184,6 +196,7 @@ def build_runoff(flow_m3s: np.ndarray, seep_m3d: Optional[np.ndarray], channel_i
     runoff = np.zeros((n_days, n_reaches))
     loss_reach = np.zeros((n_days, n_reaches)) if trans is not None else None
     unmapped, seep_total = 0.0, 0.0
+    offgrid = np.zeros(n_days) if ingrid_fraction is not None else None
     for cid, j in col.items():
         q = flow_m3s[:, j] * 86400.0
         if np.isnan(q).any():
@@ -204,8 +217,12 @@ def build_runoff(flow_m3s: np.ndarray, seep_m3d: Optional[np.ndarray], channel_i
             loss = qp - lane.lane_outflow_lateral(qp, trans["len_km"][cid], trans["wd_m"][cid],
                                                   trans["k_in_per_h"], trans["duration_h"])
             q = q - loss
+        if offgrid is not None:
+            f = min(max(float(ingrid_fraction.get(cid, 1.0)), 0.0), 1.0)
+            if f < 1.0 - 1e-9:   # a full in-grid fraction can sum to 1 - 1e-16 in float
+                offgrid += q * (1.0 - f)
         for rno, frac in reaches:
             runoff[:, rno] += q * frac
             if loss is not None:
                 loss_reach[:, rno] += loss * frac
-    return RunoffResult(runoff, loss_reach, unmapped, seep_total)
+    return RunoffResult(runoff, loss_reach, unmapped, seep_total, offgrid)

@@ -11,15 +11,18 @@ never imports the engine.
 
 ## Install
 
-Build the archive (standard library only) and install it with *Plugins > Manage and Install Plugins >
-Install from ZIP*:
+The plugin is distributed through GitHub only (it is not in the official QGIS plugin repository). Download
+`swatplus_modflow_qgis-<version>.zip` from the
+[releases page](https://github.com/ajprice16/swatplus-modflow6-coupling/releases) and install it with
+*Plugins > Manage and Install Plugins > Install from ZIP*. To build the same archive from a checkout
+(standard library only):
 
 ```
 python qgis_plugin/build_plugin_zip.py          # writes qgis_plugin/build/swatplus_modflow_qgis-<version>.zip
 ```
 
 The archive's only top-level folder is `swatplus_modflow_qgis/`; tests and caches are excluded. The plugin is
-flagged experimental, so enable *Show also experimental plugins* if you install from a repository.
+flagged experimental.
 For development, link or copy `qgis_plugin/swatplus_modflow_qgis/` into the `python/plugins` folder of a QGIS
 profile.
 

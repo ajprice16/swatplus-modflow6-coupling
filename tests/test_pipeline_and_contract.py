@@ -66,6 +66,8 @@ def test_full_pipeline_from_gis_layers_to_a_daily_run(tmp_path, capsys):
     assert (df["recharge_mf6_m3"] - df["recharge_intended_m3"]).abs().max() < 1e-3
     assert df["runoff_injected_m3"].to_numpy() == pytest.approx(df["runoff_intended_m3"].to_numpy())
     assert df["recharge_intended_m3"].sum() > 0 and df["runoff_intended_m3"].sum() > 0
+    # every synthetic channel lies inside the grid, so nothing is reassigned from off-grid length
+    assert "runoff_from_offgrid_length_m3" in df and (df["runoff_from_offgrid_length_m3"] == 0).all()
 
 
 def test_validate_says_to_build_first_when_sfr_reaches_is_missing(tmp_path, capsys):

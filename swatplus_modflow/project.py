@@ -95,7 +95,9 @@ class ConnectionsSection(_Section):
                           "negative = extraction). Added to the run as an extra WEL package.")
     channel_cells: Optional[Path] = Field(
         None, description="Optional channel_cells.csv (the GIS-side channel <-> cell table). Not needed to run; "
-                          "when given, validate cross-checks it against sfr_reaches.csv.")
+                          "when given, validate cross-checks it against sfr_reaches.csv and the run reports "
+                          "the channel flow from off-grid channel length that is injected into in-grid "
+                          "reaches (daily column runoff_from_offgrid_length_m3).")
     grid: Optional[Path] = Field(
         None, description="Optional grid.json. When given, validate checks it against the MODFLOW "
                           "discretization and the project CRS.")

@@ -408,3 +408,23 @@ def test_cli_version_and_validate_errors(tmp_path, capsys):
     assert out.count("ERROR:") >= 1 and "swatplus" in out
     assert main(["run", str(bad)]) == 1
     assert capsys.readouterr().out.splitlines()[-1].startswith("RESULT failed")
+
+
+def test_offgrid_channel_flow_is_injected_in_grid_and_reported():
+    """A channel with 40% of its length outside the grid: all of its local flow goes to its
+    in-grid reaches (SWAT+ water conserved) and the off-grid share is reported per day."""
+    import numpy as np
+    from swatplus_modflow.engine.forcing import build_runoff
+
+    flow = np.array([[1.0, 2.0], [0.5, 3.0]])              # m3/s, two days, channels 1 and 2
+    chan_reaches = {1: [(0, 0.5), (1, 0.5)], 2: [(2, 1.0)]}
+    upstream_of = {1: [], 2: []}
+    res = build_runoff(flow, None, [1, 2], chan_reaches, upstream_of, 3,
+                       ingrid_fraction={1: 0.6, 2: 1.0})
+    q1 = flow[:, 0] * 86400.0
+    assert res.runoff_m3d[:, :2].sum(axis=1) == pytest.approx(q1)          # nothing dropped
+    assert res.runoff_m3d.sum() == pytest.approx(flow.sum() * 86400.0)
+    assert res.offgrid_reassigned_m3d == pytest.approx(q1 * 0.4)
+    no_info = build_runoff(flow, None, [1, 2], chan_reaches, upstream_of, 3)
+    assert no_info.offgrid_reassigned_m3d is None
+    assert no_info.runoff_m3d == pytest.approx(res.runoff_m3d)

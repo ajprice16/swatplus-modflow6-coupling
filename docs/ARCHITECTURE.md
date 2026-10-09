@@ -150,6 +150,16 @@ ET from the saturated zone only occurs where the water table is within the extin
 └── mf6_work/                         # the working copy of the MODFLOW simulation (listing file, inputs)
 ```
 
+## Off-grid channel flow
+
+A SWAT+ channel's local flow (its `flo_out` minus the outflow of its upstream channels, plus SWAT+ seepage) is
+spread over the channel's SFR reaches using the length shares in `sfr_reaches.csv`, which sum to 1 for every
+channel. A channel partly outside the grid therefore has all of its local flow injected into its in-grid reaches.
+This conserves SWAT+ channel water at the cost of moving water generated along the off-grid length to the
+in-grid reaches. It is deliberately different from HRU percolation, whose off-grid share is dropped. If
+`connections.channel_cells` is given, the off-grid part, `q * (1 - f)` with `f` the channel's in-grid length
+fraction, is written daily to `runoff_from_offgrid_length_m3` and summed in the run manifest notes.
+
 ## Limitations
 
 1. Structured (DIS) grids with one GWF model; DISV/DISU and multi-model simulations are refused.

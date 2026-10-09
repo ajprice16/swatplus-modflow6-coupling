@@ -55,6 +55,18 @@ specified in [docs/DATA_CONTRACTS.md](docs/DATA_CONTRACTS.md).
 `connections.channel_reaches` (the `sfr_reaches.csv` that `build-modflow` writes) does not exist, `validate` and
 `run` stop with an error that says to run `build-modflow` first.
 
+## Modelling choices to be aware of
+
+* **Channel flow outside the grid is kept.** When part of a SWAT+ channel lies outside the MODFLOW grid, the
+  channel's whole local flow is injected into its in-grid SFR reaches, in proportion to reach length. SWAT+ channel
+  water is therefore conserved, but flow generated along the off-grid length enters the model at the in-grid
+  reaches. When `connections.channel_cells` is set, the run reports this volume per day in the
+  `runoff_from_offgrid_length_m3` column of the daily summary and as a total in the run manifest notes;
+  `validate` warns about the affected channels.
+* **HRU percolation outside the grid leaves the model.** HRU fractions are relative to the whole HRU polygon, so
+  the part of an HRU outside the grid contributes no recharge. Both `build-connections` and `validate` report it.
+* **`run` never builds the MODFLOW model.** Build it first with `build-modflow`.
+
 ## Typical workflow
 
 1. **Grid.** Write `grid.json` (docs/DATA_CONTRACTS.md section 2): lower-left origin, uniform cells, projected CRS.
