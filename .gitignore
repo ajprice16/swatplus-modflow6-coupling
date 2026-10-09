@@ -116,3 +116,7 @@ Software-Documentation/Academic Papers/
 
 # editor/tool backups
 *.bak
+
+# GUI screenshots from capture runs
+shots/
+plugin-shots/
