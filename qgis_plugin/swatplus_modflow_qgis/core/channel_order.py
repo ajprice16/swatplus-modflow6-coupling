@@ -31,8 +31,8 @@ def chain_parts(parts: Sequence[Sequence[Point]], tol: float = 1e-6) -> Tuple[Li
 
     Returns ``(ordered_parts, gaps)`` where each element of ``ordered_parts``
     is an oriented polyline and ``gaps`` is the number of joins that were not
-    exact (``gap > tol``) or missing. The first part keeps its digitised
-    direction unless another part attaches at its start.
+    exact (``gap > tol``) or missing. The path starts at a free end, keeping the
+    digitised direction of the first part whenever possible.
     """
     parts = [list(p) for p in parts if len(p) >= 2]
     if not parts:
@@ -41,10 +41,19 @@ def chain_parts(parts: Sequence[Sequence[Point]], tol: float = 1e-6) -> Tuple[Li
         return [parts[0]], 0
 
     remaining = parts[:]
-    # Start from the part whose start point is not touched by any other part's end.
-    def touches_start(p, others):
-        return any(_d(p[0], o[-1]) <= tol or _d(p[0], o[0]) <= tol for o in others if o is not p)
-    start = next((p for p in remaining if not touches_start(p, remaining)), remaining[0])
+
+    def touched(pt, me):
+        return any(o is not me and (_d(pt, o[0]) <= tol or _d(pt, o[-1]) <= tol) for o in remaining)
+
+    # The path starts at a free end (an end no other part touches). Prefer a free *start*, which keeps the
+    # digitised direction; otherwise flip the first part that has a free end. With no free end (a closed
+    # loop) the first part is used as it is.
+    start = next((p for p in remaining if not touched(p[0], p)), None)
+    if start is None:
+        flip_me = next((p for p in remaining if not touched(p[-1], p)), None)
+        start = flip_me[::-1] if flip_me is not None else remaining[0]
+        if flip_me is not None:
+            remaining[remaining.index(flip_me)] = start
     remaining.remove(start)
     chain = [start]
     gaps = 0
