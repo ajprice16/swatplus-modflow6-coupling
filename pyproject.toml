@@ -7,11 +7,10 @@ name = "swatplus-modflow6-coupling"
 version = "0.1.0"
 description = "A Python framework for coupling the SWAT+ watershed model with the MODFLOW 6 groundwater model"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "Hydrologic Coupling Team" }]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

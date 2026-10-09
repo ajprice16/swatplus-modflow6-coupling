@@ -24,7 +24,7 @@ swatplus-modflow version
 ```
 
 Extras: `bmi` = `xmipy`, `modflowapi` (needed by `run`); `gis` = `geopandas`, `rasterio`, `shapely`, `pyproj`
-(needed by the builders); `dev` = test tools plus both. Python 3.10–3.13.
+(needed by the builders); `dev` = test tools plus both. Python 3.11–3.13.
 
 ### Binaries
 
