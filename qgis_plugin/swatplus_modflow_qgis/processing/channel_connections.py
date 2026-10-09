@@ -61,9 +61,9 @@ class ChannelConnectionsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterNumber(
             self.LAYER, "MODFLOW layer of the channel cells", Qgis.ProcessingNumberParameterType.Integer, 1, minValue=1))
         self.addParameter(QgsProcessingParameterBoolean(
-            self.REVERSE, "Reverse: lines are digitised downstream to upstream", False))
+            self.REVERSE, "Lines run downstream to upstream (reverse them)", False))
         self.addParameter(QgsProcessingParameterRasterLayer(
-            self.DEM, "DEM to orient channels downhill (optional)", optional=True))
+            self.DEM, "DEM to orient channels downhill", optional=True))
         self.addParameter(QgsProcessingParameterNumber(
             self.TOLERANCE, "Tolerance for joining line parts (map units)", Qgis.ProcessingNumberParameterType.Double,
             0.1, minValue=0.0))

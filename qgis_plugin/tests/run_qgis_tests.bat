@@ -22,6 +22,8 @@ if not defined PYQGIS (
   exit /b 2
 )
 if not defined QT_QPA_PLATFORM set "QT_QPA_PLATFORM=offscreen"
+rem The offscreen platform finds no fonts on Windows unless told where they are.
+if not defined QT_QPA_FONTDIR set "QT_QPA_FONTDIR=%WINDIR%\Fonts"
 set "PYTHONDONTWRITEBYTECODE=1"
 cd /d "%~dp0qgis"
 echo Using %PYQGIS%

@@ -48,17 +48,17 @@ class ValidateInputsAlgorithm(QgsProcessingAlgorithm):
     def initAlgorithm(self, config=None):
         poly = [Qgis.ProcessingSourceType.VectorPolygon]
         self.addParameter(QgsProcessingParameterFeatureSource(self.GRID, "MODFLOW grid layer", poly))
-        self.addParameter(QgsProcessingParameterFile(self.GRID_JSON, "grid.json (optional)", extension="json", optional=True))
-        self.addParameter(QgsProcessingParameterFeatureSource(self.DOMAIN, "Model domain polygon layer (optional)", poly, optional=True))
-        self.addParameter(QgsProcessingParameterFeatureSource(self.HRUS, "HRU polygon layer (optional)", poly, optional=True))
+        self.addParameter(QgsProcessingParameterFile(self.GRID_JSON, "grid.json", extension="json", optional=True))
+        self.addParameter(QgsProcessingParameterFeatureSource(self.DOMAIN, "Model domain polygon layer", poly, optional=True))
+        self.addParameter(QgsProcessingParameterFeatureSource(self.HRUS, "HRU polygon layer", poly, optional=True))
         self.addParameter(QgsProcessingParameterField(
             self.HRU_ID_FIELD, "HRU id field", "HRUS", self.HRUS, Qgis.ProcessingFieldParameterDataType.Any, optional=True))
         self.addParameter(QgsProcessingParameterFeatureSource(
-            self.CHANNELS, "Channel line layer (optional)", [Qgis.ProcessingSourceType.VectorLine], optional=True))
+            self.CHANNELS, "Channel line layer", [Qgis.ProcessingSourceType.VectorLine], optional=True))
         self.addParameter(QgsProcessingParameterField(
             self.CHANNEL_ID_FIELD, "Channel id field", "Channel", self.CHANNELS, Qgis.ProcessingFieldParameterDataType.Any, optional=True))
-        self.addParameter(QgsProcessingParameterFile(self.HRU_CELLS, "hru_cells.csv (optional)", extension="csv", optional=True))
-        self.addParameter(QgsProcessingParameterFile(self.CHANNEL_CELLS, "channel_cells.csv (optional)", extension="csv", optional=True))
+        self.addParameter(QgsProcessingParameterFile(self.HRU_CELLS, "hru_cells.csv", extension="csv", optional=True))
+        self.addParameter(QgsProcessingParameterFile(self.CHANNEL_CELLS, "channel_cells.csv", extension="csv", optional=True))
         self.addParameter(QgsProcessingParameterFileDestination(
             self.REPORT, "Report (HTML, optional)", "HTML files (*.html)", optional=True, createByDefault=False))
         self.addOutput(QgsProcessingOutputNumber("ERRORS", "Errors"))
