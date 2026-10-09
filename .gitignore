@@ -1,0 +1,115 @@
+# SWAT+ - MODFLOW 6 Coupling Repository
+
+## Project specific setup
+
+# Local config overrides (optional; see config.example.yaml)
+config.yaml
+paths.local.yaml
+
+# Model / data directories (user-supplied; not part of the package)
+models/
+data/
+analysis/
+results/
+*/modflow/
+*/swatplus/
+
+# Data files (large, git-ignored)
+*.tif
+*.gpkg
+*.shp
+*.dbf
+*.shx
+*.prj
+*.cpg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Development
+.venv
+venv/
+ENV/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+
+# Output files
+results/
+coupling_output/
+analysis/
+*.log
+*.csv
+*.h5
+*.nc
+*.out
+
+# Hydrogeology raw and processed data
+data/hydrogeology/
+
+# PRISM weather data cache/output
+prism_raw/
+prism_data/
+prism_data_*/
+swatplus_weather/
+data/prism_raw/
+data/prism_bulk_raw*/
+data/prism_*/
+data/swatplus_weather*/
+
+# (work logs, paper notes, and VM handoff docs are tracked in dev repo — excluded
+#  from public releases via the orphan branch process, not gitignore)
+
+# OS
+.DS_Store
+Thumbs.db
+
+.pytest_cache/
+.benchmarks/
+._*
+
+# Keep illustrative sample connections
+!examples/sample_connections.csv
+
+# Third-party papers are cited in the docs, never committed
+Software-Documentation/Academic Papers/
+*.pdf
+
+# Local scratch (pytest/TMPDIR)
+.tmp/
+.DS_Store

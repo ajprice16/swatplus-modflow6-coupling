@@ -1,0 +1,44 @@
+# SWAT+ / MODFLOW 6 coupled project — example (schema_version 1)
+# Copy next to your model folders and edit. Relative paths resolve against
+# this file's folder. Nothing here refers to a real watershed.
+schema_version: 1
+name: example-watershed
+crs: "EPSG:<code>"              # projected CRS shared by all spatial inputs
+
+swatplus:
+  txtinout: swatplus/TxtInOut
+  executable: /path/to/swatplus  # or a name on PATH
+  run_swatplus: true
+
+modflow:
+  sim_dir: modflow
+  # model_name: gwf              # needed only if the simulation has several models
+  libmf6: /path/to/libmf6.so     # .dylib on macOS, .dll on Windows
+  # initial_heads: modflow/spinup.hds
+  solver:
+    newton: true
+    outer_maximum: 200
+    outer_dvclose: 1.0e-3
+
+connections:
+  hru_cells: connections/hru_cells.csv
+  channel_reaches: connections/channel_reaches.csv
+
+period:
+  start: 2000-01-01
+  end: 2009-12-31
+  spinup_days: 365
+
+coupling:
+  mode: sequential_daily
+  recharge_update: monthly       # daily | monthly | monthly_ramped
+  recharge_delay_days: 0.0
+  pumping_scale: 1.0
+
+checks:
+  enforce_invariants: true
+  mass_balance_tolerance_percent: 0.1
+
+output:
+  directory: results
+  prefix: coupled_

@@ -1,0 +1,41 @@
+# Legacy configuration for the SWATPlusMODFLOWCoupler facade.
+# New projects use project.example.yaml (swatplus_modflow.project).
+# SWAT+ / MODFLOW 6 coupling — example configuration
+# Copy to config.yaml and edit. No study-area defaults are baked in.
+
+modflow:
+  executable: "/path/to/mf6"
+  working_directory: "./models/modflow"
+  convergence_tol: 1.0e-4
+  max_iterations: 10000
+  output_interval: 1
+  # Optional BMI / XMI shared library (platform-specific name)
+  # libmf6: "/path/to/libmf6.dylib"
+
+swatplus:
+  executable: "/path/to/swatplus"
+  working_directory: "./models/swatplus"
+  output_interval: 1
+
+coupling:
+  connections_file: "./models/connections/connections.gpkg"
+  recharge_delay_days: 10.0
+  et_extinction_depth_m: 3.0
+  modflow_convergence_tol: 1.0e-4
+  max_iterations: 10000
+  save_state_interval_days: 30
+  save_cell_fluxes: true
+  save_daily_summary: true
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "coupling.log"
+
+output:
+  directory: "./results"
+  daily_summary_file: "coupled_daily_summary.csv"
+  cell_fluxes_file: "coupled_cell_fluxes_{year}_{month}.csv"
+  heads_file: "coupled_heads_{year}_{month}.csv"
+  water_balance_file: "coupled_water_balance.txt"
+  state_file: "coupled_state.h5"
