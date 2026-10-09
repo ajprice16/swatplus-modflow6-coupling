@@ -1,10 +1,10 @@
 """Create MODFLOW grid."""
 from __future__ import annotations
 
-from qgis.core import (Qgis, QgsFeature, QgsFields, QgsField, QgsGeometry, QgsProcessing, QgsProcessingAlgorithm,
+from qgis.core import (Qgis, QgsFeature, QgsFields, QgsField, QgsGeometry, QgsProcessingAlgorithm,
                        QgsProcessingException, QgsProcessingOutputNumber, QgsProcessingParameterBoolean, QgsProcessingParameterFeatureSink,
                        QgsProcessingParameterFeatureSource, QgsProcessingParameterFileDestination,
-                       QgsProcessingParameterNumber, QgsRectangle, QgsWkbTypes)
+                       QgsProcessingParameterNumber, QgsRectangle)
 from qgis.PyQt.QtCore import QMetaType
 
 from ..core import grid as gridmod

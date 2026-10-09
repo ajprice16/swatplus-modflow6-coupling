@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run the headless QGIS tests with the Python bundled in a QGIS installation (macOS app bundle layout).
-#   QGIS_APP=/Applications/QGIS-<version>.app qgis_plugin/tests/run_qgis_tests.sh [unittest args]
+#   QGIS_APP=/path/to/QGIS.app qgis_plugin/tests/run_qgis_tests.sh [unittest args]
 # Tests use a throw-away profile folder, never the user's QGIS profile.
 set -euo pipefail
 : "${QGIS_APP:?set QGIS_APP to the QGIS .app bundle}"
