@@ -393,8 +393,11 @@ def test_cli_version_and_validate_errors(tmp_path, capsys):
     from swatplus_modflow.cli import main
     assert main(["version"]) == 0
     assert capsys.readouterr().out.strip() == f"swatplus-modflow {__version__}"
+    import os
+    root = str(Path(__file__).resolve().parents[1])
+    env = {**os.environ, "PYTHONPATH": root + os.pathsep + os.environ.get("PYTHONPATH", "")}
     proc = subprocess.run([sys.executable, "-m", "swatplus_modflow", "version"], capture_output=True, text=True,
-                          cwd=Path(__file__).resolve().parents[1])
+                          cwd=root, env=env)
     assert proc.returncode == 0 and proc.stdout.strip() == f"swatplus-modflow {__version__}"
     assert main(["validate", str(tmp_path / "nope.yaml")]) == 1
     assert "ERROR: project file not found" in capsys.readouterr().out
