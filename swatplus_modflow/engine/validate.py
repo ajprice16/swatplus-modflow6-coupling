@@ -92,7 +92,7 @@ def validate_config(cfg: ProjectConfig) -> Tuple[List[str], List[str]]:
     except EngineInputError as exc:
         errors.append(str(exc))
     if cfg.connections.grid is not None:
-        from ..build.grid import BuildInputError, crs_equal, read_grid
+        from ..builders.grid import BuildInputError, crs_equal, read_grid
         try:
             g = read_grid(cfg.connections.grid)
             if (g.nrow, g.ncol) != (info.nrow, info.ncol):

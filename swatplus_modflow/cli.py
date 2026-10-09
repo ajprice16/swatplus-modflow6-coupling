@@ -67,12 +67,12 @@ def _one_line(exc: BaseException) -> str:
 
 
 def _cmd_build_modflow(args) -> int:
-    from .build.cli import run_build_modflow
+    from .builders.cli import run_build_modflow
     return run_build_modflow(args)
 
 
 def _cmd_build_connections(args) -> int:
-    from .build.cli import run_build_connections
+    from .builders.cli import run_build_connections
     return run_build_connections(args)
 
 

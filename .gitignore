@@ -29,7 +29,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
+/build/
 develop-eggs/
 dist/
 downloads/
@@ -113,3 +113,6 @@ Software-Documentation/Academic Papers/
 # Local scratch (pytest/TMPDIR)
 .tmp/
 .DS_Store
+
+# editor/tool backups
+*.bak
