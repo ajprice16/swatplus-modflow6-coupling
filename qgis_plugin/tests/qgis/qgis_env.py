@@ -19,6 +19,8 @@ for _p in (PLUGIN_PARENT, REPO):
 
 from qgis.core import (QgsApplication, QgsCoordinateReferenceSystem, QgsFeature, QgsField, QgsGeometry, QgsPointXY,
                        QgsProject, QgsRasterLayer, QgsVectorLayer)
+
+FAKE_ENGINE = REPO_FAKE = Path(__file__).resolve().parents[1] / "fake_engine"
 from qgis.PyQt.QtCore import QMetaType
 
 CRS = "EPSG:32633"   # arbitrary projected CRS
@@ -38,7 +40,7 @@ def start_qgis():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     _profile = tempfile.mkdtemp(prefix="swatplus_qgis_test_profile_")
     os.environ["QGIS_CUSTOM_CONFIG_PATH"] = _profile
-    _qgs = QgsApplication([], False)
+    _qgs = QgsApplication([], True)   # GUI mode: the dialog tests create widgets (offscreen platform)
     _qgs.initQgis()
     plugins = os.path.join(QgsApplication.pkgDataPath(), "python", "plugins")
     if plugins not in sys.path:
