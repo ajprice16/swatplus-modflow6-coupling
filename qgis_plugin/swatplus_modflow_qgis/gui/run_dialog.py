@@ -52,7 +52,9 @@ class RunDialog(QDialog):
         top = QFormLayout()
         self.project_path = PathEdit("save", "Project files (*.json *.yaml *.yml);;All files (*)", "Project file")
         top.addRow("Project file", self.project_path)
-        self.use_form = QCheckBox("Use the form below (writes the project file as JSON before every run)")
+        self.use_form = QCheckBox("Use the form below")
+        self.use_form.setToolTip("Write the project file from the form (as JSON) before every validate and run. "
+                                 "Untick to run an existing project file unchanged.")
         self.use_form.setChecked(True)
         top.addRow(self.use_form)
         self.engine_label = QLabel()
@@ -114,7 +116,9 @@ class RunDialog(QDialog):
         self.crs.setPlaceholderText("AUTHORITY:CODE of the shared projected CRS")
         self.txtinout = PathEdit("folder", title="SWAT+ TxtInOut folder")
         self.executable = PathEdit("file", title="SWAT+ executable")
-        self.run_swatplus = QCheckBox("Run SWAT+ first (otherwise reuse its daily outputs)")
+        self.run_swatplus = QCheckBox("Run SWAT+ first")
+        self.run_swatplus.setToolTip("Run the SWAT+ executable before MODFLOW. Untick to reuse the daily "
+                                     "outputs already in TxtInOut.")
         self.run_swatplus.setChecked(True)
         self.sim_dir = PathEdit("folder", title="MODFLOW 6 simulation folder")
         self.libmf6 = PathEdit("file", title="libmf6 shared library")
