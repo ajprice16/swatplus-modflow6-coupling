@@ -116,3 +116,7 @@ MIT — see [LICENSE](LICENSE).
 ## Citation
 
 [IN PROGRESS]
+
+## QGIS plugin
+
+`qgis_plugin/swatplus_modflow_qgis/` is a QGIS 3.40+/4.x plugin that prepares the grid and connection tables and runs the engine as a separate process; see [docs/QGIS_PLUGIN.md](docs/QGIS_PLUGIN.md).

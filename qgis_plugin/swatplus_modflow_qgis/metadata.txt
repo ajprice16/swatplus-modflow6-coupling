@@ -1,0 +1,20 @@
+[general]
+name=SWAT+ MODFLOW 6 Coupling
+qgisMinimumVersion=3.40
+qgisMaximumVersion=4.99
+supportsQt6=True
+description=Prepare grid and connection tables for coupled SWAT+ / MODFLOW 6 models and run the coupling engine.
+about=Builds the MODFLOW grid, the HRU-to-cell and channel-to-cell connection tables and the engine project file with native QGIS tools (Processing algorithms), then runs the coupling engine as a separate process in a Python environment you choose and loads its results. The plugin uses only the Python bundled with QGIS; the engine (flopy, MODFLOW 6 and so on) is never imported into QGIS. The plugin is not tied to any study area.
+version=0.1.0
+author=Hydrologic Coupling Development Team
+email=
+repository=https://github.com/ajprice16/swatplus-modflow6-coupling
+homepage=https://github.com/ajprice16/swatplus-modflow6-coupling
+tracker=https://github.com/ajprice16/swatplus-modflow6-coupling/issues
+tags=hydrology,groundwater,modflow,swat,watershed,processing
+category=Analysis
+icon=icon.svg
+experimental=True
+deprecated=False
+hasProcessingProvider=yes
+changelog=0.1.0 - first version: grid, HRU and channel connection tools, validation, engine runner.
