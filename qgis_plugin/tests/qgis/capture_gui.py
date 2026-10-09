@@ -175,6 +175,14 @@ def capture(out_root: Path) -> int:
     out.mkdir(parents=True, exist_ok=True)
     info = {"tag": tag, "qgis": Qgis.version(), "qt": QT_VERSION_STR, "python": sys.version.split()[0],
             "platform": platform.platform(), "windows": {}}
+    from qgis.PyQt.QtGui import QFontMetrics
+    from qgis.PyQt.QtWidgets import QApplication
+    font, scr = QApplication.font(), QApplication.primaryScreen()
+    info["font"] = {"family": font.family(), "point_size": font.pointSizeF(),
+                    "avg_char_width_px": QFontMetrics(font).averageCharWidth()}
+    if scr is not None:
+        info["screen"] = {"logical_dpi": scr.logicalDotsPerInch(), "device_pixel_ratio": scr.devicePixelRatio(),
+                          "size": [scr.size().width(), scr.size().height()]}
     iface = FakeIface()
     work = Path(tempfile.mkdtemp(prefix="swatplus_capture_"))
 
@@ -277,8 +285,13 @@ def build_sheet(out_root: Path) -> Path:
             runs.append(json.loads(f.read_text()))
     names = sorted({n for r in runs for n in r["windows"]})
     esc = html.escape
-    head = "".join(f"<th>{esc(r['tag'])}<br><small>QGIS {esc(r['qgis'])}, Qt {esc(r['qt'])}, "
-                   f"Python {esc(r['python'])}</small></th>" for r in runs)
+    def meta(r):
+        f, s = r.get("font", {}), r.get("screen", {})
+        extra = (f"<br>font {esc(str(f.get('family', '?')))} {f.get('point_size', '?')} pt, "
+                 f"avg char {f.get('avg_char_width_px', '?')} px, {s.get('logical_dpi', '?')} dpi") if f else ""
+        return (f"<th>{esc(r['tag'])}<br><small>QGIS {esc(r['qgis'])}, Qt {esc(r['qt'])}, "
+                f"Python {esc(r['python'])}{extra}</small></th>")
+    head = "".join(meta(r) for r in runs)
     rows = []
     for n in names:
         cells = []

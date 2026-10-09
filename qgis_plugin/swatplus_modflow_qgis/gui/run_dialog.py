@@ -79,7 +79,6 @@ class RunDialog(QDialog):
         grid_row.addRow("Grid layer for cell results", self.grid_combo)
         root.addLayout(grid_row)
 
-        row = QHBoxLayout()
         self.load_button = QPushButton("Load project file")
         self.save_button = QPushButton("Write project file")
         self.validate_button = QPushButton("Validate with engine")
@@ -87,9 +86,13 @@ class RunDialog(QDialog):
         self.cancel_button = QPushButton("Cancel run")
         self.cancel_button.setEnabled(False)
         self.results_button = QPushButton("Load results...")
-        for b in (self.load_button, self.save_button, self.validate_button, self.run_button, self.cancel_button, self.results_button):
-            row.addWidget(b)
-        root.addLayout(row)
+        # two rows (project file / run), so the dialog stays narrow on small or high-DPI screens
+        for group in ((self.load_button, self.save_button, self.validate_button),
+                      (self.run_button, self.cancel_button, self.results_button)):
+            row = QHBoxLayout()
+            for b in group:
+                row.addWidget(b)
+            root.addLayout(row)
         self.progress = QProgressBar()
         self.progress.setRange(0, 1)
         self.progress.setValue(0)
