@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from pathlib import Path
 from typing import List, Optional
 
 from . import __version__
@@ -57,7 +58,7 @@ def _cmd_run(args) -> int:
         logging.getLogger(__name__).error("%s: %s", type(exc).__name__, exc)
         print(f"RESULT failed {_one_line(exc)}")
         return 2
-    print(f"RESULT succeeded {manifest}")
+    print(f"RESULT succeeded {Path(manifest).resolve()}")
     return 0
 
 
@@ -89,13 +90,24 @@ def make_parser() -> argparse.ArgumentParser:
     b.add_argument("spec")
     b.set_defaults(func=_cmd_build_modflow)
     c = sub.add_parser("build-connections", help="write hru_cells.csv / channel_cells.csv from GIS layers")
-    c.add_argument("--grid", required=True, help="grid.json (or a grid polygon layer)")
+    c.add_argument("--grid", required=True, help="grid.json")
+    c.add_argument("--grid-layer", help="grid polygon layer (GeoPackage) with row, col, active fields; "
+                                        "cells with active != 1 receive no rows")
+    c.add_argument("--grid-layer-name", help="layer name inside --grid-layer")
     c.add_argument("--hrus", help="HRU polygon layer")
     c.add_argument("--channels", help="channel line layer")
     c.add_argument("--out-dir", required=True)
     c.add_argument("--hru-id-field", default="HRUS")
     c.add_argument("--channel-id-field", default="Channel")
-    c.add_argument("--crs", help="expected CRS of the layers, e.g. EPSG:<code>")
+    c.add_argument("--crs", help="CRS the layers are expected to have, e.g. EPSG:<code>; must equal grid.json's")
+    c.add_argument("--reproject", action="store_true", help="reproject layers to the grid CRS instead of failing")
+    c.add_argument("--layer", type=int, default=1, help="MODFLOW layer written to the tables (default 1)")
+    c.add_argument("--min-fraction", type=float, default=0.0,
+                   help="drop HRU pieces smaller than this fraction of the HRU (default 0: keep all)")
+    c.add_argument("--direction", default="as_drawn", choices=["as_drawn", "reversed", "dem"],
+                   help="channel line direction: vertices run upstream->downstream (default), the reverse, or "
+                        "inferred from --dem")
+    c.add_argument("--dem", help="raster in the grid CRS, used only for --direction dem")
     c.set_defaults(func=_cmd_build_connections)
     return p
 

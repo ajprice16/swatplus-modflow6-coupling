@@ -1,0 +1,87 @@
+# MODFLOW 6 build specification (build_version 1) -- example
+# Run:  swatplus-modflow build-modflow build.example.yaml
+# Relative paths resolve against this file's folder. Every layer must be in the grid's CRS.
+# All numbers below are illustrative placeholders: replace them with values for your own site.
+# Nothing in this file refers to a real watershed.
+build_version: 1
+name: example-model
+
+grid: grid.json                    # docs/DATA_CONTRACTS.md section 2 (lower-left origin, uniform cells)
+
+output:
+  directory: modflow               # receives mfsim.nam, the package files, sfr_reaches.csv,
+  model_name: gwf                  #   grid.json, grid_cells.gpkg, zone_report.csv, build_report.json
+  write_grid_layer: true
+
+domain:
+  polygons: {path: gis/domain.gpkg}      # model boundary polygon(s)
+  rule: overlap                          # overlap: positive-area overlap (cells that only touch are inactive)
+                                         # center:  cell centre inside the polygon
+
+top:
+  dem: {path: gis/dem.tif, resampling: average}   # aggregated onto the model cells
+
+layers:                            # top to bottom; give exactly one of thickness_m / bottom / thickness
+  - {name: upper, thickness_m: 30.0}
+  - {name: lower, bottom: {path: gis/base.tif}}
+min_thickness_m: 1.0
+thin_cells: error                  # error | enforce (thicken cells to min_thickness_m and warn)
+
+properties:
+  default:                         # used wherever no zone applies; there are no built-in values
+    k_m_per_day: 1.0
+    k33_over_k: 0.1
+    sy: 0.1
+    ss_per_m: 1.0e-5
+  rules:
+    max_zone_share_percent: 60     # screening threshold (see docs/ARCHITECTURE.md, "Zone precedence")
+    on_dominant: error             # error | warn
+  zones:
+    # Where zones overlap, the LARGER priority wins. Priorities must be unique, so the outcome of an
+    # overlap is never implicit. Put broad regional classes at LOW priority and local, finer zones at
+    # HIGH priority. zone_report.csv states, per zone and property, how many cells were set and lost.
+    - name: regional-background
+      polygons: {path: gis/zones.gpkg}
+      where: {field: class, equals: regional}
+      priority: 1
+      k_m_per_day: 2.0
+    - name: local-fine
+      polygons: {path: gis/zones.gpkg}
+      where: {field: class, equals: fine}
+      priority: 10
+      k_m_per_day: 0.1
+      layers: [1]                  # optional: 1-based layers the zone applies to (default: all)
+    - name: local-coarse
+      polygons: {path: gis/zones.gpkg}
+      where: {field: class, equals: coarse}
+      priority: 20
+      k_m_per_day: 15.0
+      sy: 0.2
+
+initial_heads:
+  mode: below_top                  # below_top | constant | raster
+  depth_m: 5.0
+
+sfr:                               # optional: omit for a model without streams
+  channel_cells: connections/channel_cells.csv     # from `swatplus-modflow build-connections`
+  topology:
+    chandeg_con: swatplus/TxtInOut/chandeg.con     # or  table: channels.csv  (channel_id, downstream_id)
+  incision_m: 1.0                  # streambed top = cell top - incision (never rising downstream)
+  bed_thickness_m: 1.0
+  bed_k_m_per_day: 1.0
+  mannings_n: 0.035
+  width_m: 5.0                     # constant; optional per-channel widths: channel_table (channel_id, width_m)
+  min_slope: 1.0e-4                # floor for the gradient computed from the bed profile
+  # bed_clearance_m: 0.01          # numerical margin above the cell bottom (default 0.01)
+
+evt:                               # optional
+  rate_m_per_day: 2.0e-4
+  extinction_depth_m: 3.0
+
+boundaries: []                     # optional chd / drn cells from vector features, for example:
+#  - name: outlet
+#    type: chd                     # chd | drn
+#    features: {path: gis/outlet.gpkg}
+#    layer: 1
+#    head_below_top_m: 2.0         # head (chd) or drain elevation (drn) = cell top - this
+#    conductance_m2_per_day: 100.0 # drn only

@@ -3,6 +3,13 @@
     "ChecksSection": {
       "additionalProperties": false,
       "properties": {
+        "allow_nonconvergence_steps": {
+          "default": 0,
+          "description": "Non-converged days tolerated before stopping.",
+          "minimum": 0,
+          "title": "Allow Nonconvergence Steps",
+          "type": "integer"
+        },
         "enforce_invariants": {
           "default": true,
           "description": "Stop the run when a coupling invariant fails.",
@@ -15,13 +22,6 @@
           "maximum": 5.0,
           "title": "Mass Balance Tolerance Percent",
           "type": "number"
-        },
-        "allow_nonconvergence_steps": {
-          "default": 0,
-          "description": "Non-converged days tolerated before stopping.",
-          "minimum": 0,
-          "title": "Allow Nonconvergence Steps",
-          "type": "integer"
         }
       },
       "title": "ChecksSection",
@@ -30,16 +30,44 @@
     "ConnectionsSection": {
       "additionalProperties": false,
       "properties": {
-        "hru_cells": {
-          "description": "HRU <-> cell table (swat_obj_id, mf_layer, mf_row, mf_col, fraction).",
-          "format": "path",
-          "title": "Hru Cells",
-          "type": "string"
+        "channel_cells": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional channel_cells.csv (the GIS-side channel <-> cell table). Not needed to run; when given, validate cross-checks it against sfr_reaches.csv.",
+          "title": "Channel Cells"
         },
         "channel_reaches": {
-          "description": "SWAT+ channel <-> MF6 SFR reach table.",
+          "description": "SWAT+ channel <-> MF6 SFR reach table sfr_reaches.csv (rno, channel_id, seq, layer, row, col, length_m).",
           "format": "path",
           "title": "Channel Reaches",
+          "type": "string"
+        },
+        "grid": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional grid.json. When given, validate checks it against the MODFLOW discretization and the project CRS.",
+          "title": "Grid"
+        },
+        "hru_cells": {
+          "description": "HRU <-> cell table hru_cells.csv (hru_id, layer, row, col, area_m2, fraction).",
+          "format": "path",
+          "title": "Hru Cells",
           "type": "string"
         },
         "well_cells": {
@@ -53,7 +81,7 @@
             }
           ],
           "default": null,
-          "description": "Optional irrigation/pumping well table.",
+          "description": "Optional pumping table well_cells.csv (layer, row, col, rate_m3d; MODFLOW sign: negative = extraction). Added to the run as an extra WEL package.",
           "title": "Well Cells"
         }
       },
@@ -67,36 +95,6 @@
     "CouplingSection": {
       "additionalProperties": false,
       "properties": {
-        "mode": {
-          "const": "sequential_daily",
-          "default": "sequential_daily",
-          "description": "SWAT+ runs first; MODFLOW 6 then advances one day at a time through libmf6, with SFR runoff and recharge set in memory from the SWAT+ daily output.",
-          "title": "Mode",
-          "type": "string"
-        },
-        "recharge_update": {
-          "default": "monthly",
-          "enum": [
-            "daily",
-            "monthly",
-            "monthly_ramped"
-          ],
-          "title": "Recharge Update",
-          "type": "string"
-        },
-        "recharge_delay_days": {
-          "default": 0.0,
-          "description": "Vadose-zone delay (SWAT gw_delay form). 0 passes percolation through unchanged.",
-          "minimum": 0,
-          "title": "Recharge Delay Days",
-          "type": "number"
-        },
-        "recharge_to_water_table": {
-          "default": true,
-          "description": "Apply recharge to the highest active cell.",
-          "title": "Recharge To Water Table",
-          "type": "boolean"
-        },
         "et_extinction_depth_m": {
           "anyOf": [
             {
@@ -111,12 +109,58 @@
           "description": "Overrides the EVT extinction depth when set; otherwise the EVT package value is used.",
           "title": "Et Extinction Depth M"
         },
+        "evt_monthly_factors": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional 12 multipliers (January..December) applied to the EVT package rate. No default: the model's own rate is used unchanged when omitted.",
+          "title": "Evt Monthly Factors"
+        },
+        "mode": {
+          "const": "sequential_daily",
+          "default": "sequential_daily",
+          "description": "SWAT+ runs first; MODFLOW 6 then advances one day at a time through libmf6, with SFR runoff and recharge set in memory from the SWAT+ daily output.",
+          "title": "Mode",
+          "type": "string"
+        },
         "pumping_scale": {
           "default": 1.0,
           "description": "Multiplier on well rates (0 disables pumping).",
           "minimum": 0,
           "title": "Pumping Scale",
           "type": "number"
+        },
+        "recharge_delay_days": {
+          "default": 0.0,
+          "description": "Vadose-zone delay (SWAT gw_delay form). 0 passes percolation through unchanged.",
+          "minimum": 0,
+          "title": "Recharge Delay Days",
+          "type": "number"
+        },
+        "recharge_to_water_table": {
+          "default": true,
+          "description": "Apply recharge to the highest active cell.",
+          "title": "Recharge To Water Table",
+          "type": "boolean"
+        },
+        "recharge_update": {
+          "default": "monthly",
+          "enum": [
+            "daily",
+            "monthly",
+            "monthly_ramped"
+          ],
+          "title": "Recharge Update",
+          "type": "string"
         },
         "transmission_loss": {
           "anyOf": [
@@ -128,6 +172,21 @@
             }
           ],
           "default": null
+        },
+        "well_auto_flow_reduce": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AUTO_FLOW_REDUCE fraction for wells added from connections.well_cells (throttle pumping as the cell thins). None = off.",
+          "title": "Well Auto Flow Reduce"
         }
       },
       "title": "CouplingSection",
@@ -136,10 +195,24 @@
     "ModflowSection": {
       "additionalProperties": false,
       "properties": {
-        "sim_dir": {
-          "description": "MODFLOW 6 simulation directory holding mfsim.nam and the static packages.",
+        "initial_heads": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Binary head file whose last record is used as starting heads. Default: the IC package.",
+          "title": "Initial Heads"
+        },
+        "libmf6": {
+          "description": "Path to the libmf6 shared library (.so / .dylib / .dll).",
           "format": "path",
-          "title": "Sim Dir",
+          "title": "Libmf6",
           "type": "string"
         },
         "model_name": {
@@ -155,25 +228,11 @@
           "description": "GWF model name; may be omitted when the simulation has one model.",
           "title": "Model Name"
         },
-        "libmf6": {
-          "description": "Path to the libmf6 shared library (.so / .dylib / .dll).",
+        "sim_dir": {
+          "description": "MODFLOW 6 simulation directory holding mfsim.nam and the static packages.",
           "format": "path",
-          "title": "Libmf6",
+          "title": "Sim Dir",
           "type": "string"
-        },
-        "initial_heads": {
-          "anyOf": [
-            {
-              "format": "path",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Binary head file whose last record is used as starting heads. Default: the IC package.",
-          "title": "Initial Heads"
         },
         "solver": {
           "$ref": "#/$defs/SolverSection"
@@ -201,11 +260,6 @@
           "title": "Prefix",
           "type": "string"
         },
-        "save_heads": {
-          "default": true,
-          "title": "Save Heads",
-          "type": "boolean"
-        },
         "save_budget": {
           "default": true,
           "title": "Save Budget",
@@ -215,6 +269,17 @@
           "default": true,
           "title": "Save Daily Summary",
           "type": "boolean"
+        },
+        "save_heads": {
+          "default": true,
+          "title": "Save Heads",
+          "type": "boolean"
+        },
+        "save_reach_flows": {
+          "default": false,
+          "description": "Also write per-reach daily outflow and stream-aquifer exchange.",
+          "title": "Save Reach Flows",
+          "type": "boolean"
         }
       },
       "title": "OutputSection",
@@ -223,11 +288,6 @@
     "PeriodSection": {
       "additionalProperties": false,
       "properties": {
-        "start": {
-          "format": "date",
-          "title": "Start",
-          "type": "string"
-        },
         "end": {
           "format": "date",
           "title": "End",
@@ -239,6 +299,11 @@
           "minimum": 0,
           "title": "Spinup Days",
           "type": "integer"
+        },
+        "start": {
+          "format": "date",
+          "title": "Start",
+          "type": "string"
         }
       },
       "required": [
@@ -261,28 +326,37 @@
           "title": "Complexity",
           "type": "string"
         },
-        "newton": {
-          "default": true,
-          "description": "Use the Newton-Raphson formulation (recommended for dry/rewetting cells).",
-          "title": "Newton",
-          "type": "boolean"
-        },
-        "under_relaxation": {
-          "default": true,
-          "title": "Under Relaxation",
-          "type": "boolean"
-        },
-        "outer_maximum": {
-          "default": 200,
+        "inner_dvclose": {
+          "default": 0.0001,
           "exclusiveMinimum": 0,
-          "title": "Outer Maximum",
-          "type": "integer"
+          "title": "Inner Dvclose",
+          "type": "number"
         },
         "inner_maximum": {
           "default": 300,
           "exclusiveMinimum": 0,
           "title": "Inner Maximum",
           "type": "integer"
+        },
+        "inner_rclose": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Residual closure of the linear solver (model volume/time). Default: the value implied by 'complexity'.",
+          "title": "Inner Rclose"
+        },
+        "newton": {
+          "default": true,
+          "description": "Use the Newton-Raphson formulation (recommended for dry/rewetting cells).",
+          "title": "Newton",
+          "type": "boolean"
         },
         "outer_dvclose": {
           "default": 0.001,
@@ -291,11 +365,16 @@
           "title": "Outer Dvclose",
           "type": "number"
         },
-        "inner_dvclose": {
-          "default": 0.0001,
+        "outer_maximum": {
+          "default": 200,
           "exclusiveMinimum": 0,
-          "title": "Inner Dvclose",
-          "type": "number"
+          "title": "Outer Maximum",
+          "type": "integer"
+        },
+        "under_relaxation": {
+          "default": true,
+          "title": "Under Relaxation",
+          "type": "boolean"
         }
       },
       "title": "SolverSection",
@@ -304,12 +383,6 @@
     "SwatPlusSection": {
       "additionalProperties": false,
       "properties": {
-        "txtinout": {
-          "description": "SWAT+ TxtInOut directory (inputs, and outputs once run).",
-          "format": "path",
-          "title": "Txtinout",
-          "type": "string"
-        },
         "executable": {
           "anyOf": [
             {
@@ -328,6 +401,12 @@
           "description": "Run SWAT+ before MODFLOW. False reuses the daily outputs already in txtinout.",
           "title": "Run Swatplus",
           "type": "boolean"
+        },
+        "txtinout": {
+          "description": "SWAT+ TxtInOut directory (inputs, and outputs once run).",
+          "format": "path",
+          "title": "Txtinout",
+          "type": "string"
         }
       },
       "required": [
@@ -339,18 +418,18 @@
     "TransmissionLossSection": {
       "additionalProperties": false,
       "properties": {
-        "k_mm_per_h": {
-          "description": "Effective channel-bed hydraulic conductivity.",
-          "exclusiveMinimum": 0,
-          "title": "K Mm Per H",
-          "type": "number"
-        },
         "duration_h": {
           "default": 12.0,
           "description": "Hours per day of flow-weighted loss.",
           "exclusiveMinimum": 0,
           "maximum": 24,
           "title": "Duration H",
+          "type": "number"
+        },
+        "k_mm_per_h": {
+          "description": "Effective channel-bed hydraulic conductivity.",
+          "exclusiveMinimum": 0,
+          "title": "K Mm Per H",
           "type": "number"
         }
       },
@@ -363,11 +442,22 @@
   },
   "additionalProperties": false,
   "properties": {
-    "schema_version": {
-      "const": 1,
-      "description": "Project file format version.",
-      "title": "Schema Version",
-      "type": "integer"
+    "checks": {
+      "$ref": "#/$defs/ChecksSection"
+    },
+    "connections": {
+      "$ref": "#/$defs/ConnectionsSection"
+    },
+    "coupling": {
+      "$ref": "#/$defs/CouplingSection"
+    },
+    "crs": {
+      "description": "Projected CRS shared by every spatial input, e.g. 'EPSG:<code>'.",
+      "title": "Crs",
+      "type": "string"
+    },
+    "modflow": {
+      "$ref": "#/$defs/ModflowSection"
     },
     "name": {
       "description": "Free-text project label used in output metadata.",
@@ -375,31 +465,20 @@
       "title": "Name",
       "type": "string"
     },
-    "crs": {
-      "description": "Projected CRS shared by every spatial input, e.g. 'EPSG:<code>'.",
-      "title": "Crs",
-      "type": "string"
-    },
-    "swatplus": {
-      "$ref": "#/$defs/SwatPlusSection"
-    },
-    "modflow": {
-      "$ref": "#/$defs/ModflowSection"
-    },
-    "connections": {
-      "$ref": "#/$defs/ConnectionsSection"
+    "output": {
+      "$ref": "#/$defs/OutputSection"
     },
     "period": {
       "$ref": "#/$defs/PeriodSection"
     },
-    "coupling": {
-      "$ref": "#/$defs/CouplingSection"
+    "schema_version": {
+      "const": 1,
+      "description": "Project file format version.",
+      "title": "Schema Version",
+      "type": "integer"
     },
-    "checks": {
-      "$ref": "#/$defs/ChecksSection"
-    },
-    "output": {
-      "$ref": "#/$defs/OutputSection"
+    "swatplus": {
+      "$ref": "#/$defs/SwatPlusSection"
     }
   },
   "required": [

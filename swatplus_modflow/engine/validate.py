@@ -91,6 +91,42 @@ def validate_config(cfg: ProjectConfig) -> Tuple[List[str], List[str]]:
             errors.append(str(exc))
     except EngineInputError as exc:
         errors.append(str(exc))
+    if cfg.connections.grid is not None:
+        from ..build.grid import BuildInputError, crs_equal, read_grid
+        try:
+            g = read_grid(cfg.connections.grid)
+            if (g.nrow, g.ncol) != (info.nrow, info.ncol):
+                errors.append(f"grid.json is {g.nrow} x {g.ncol} (rows x cols) but the MODFLOW model is "
+                              f"{info.nrow} x {info.ncol}")
+            if not crs_equal(g.crs, cfg.crs):
+                errors.append(f"grid.json crs {g.crs} differs from the project crs {cfg.crs}")
+        except BuildInputError as exc:
+            errors.append(str(exc))
+    if cfg.connections.channel_cells is not None:
+        import pandas as pd
+        try:
+            cc = pd.read_csv(cfg.connections.channel_cells)
+            if "channel_id" not in cc.columns:
+                errors.append("channel_cells: missing column 'channel_id'")
+            else:
+                try:
+                    rc2 = cio.read_sfr_reaches(cfg.connections.channel_reaches, dims)
+                    gone = sorted(set(int(c) for c in rc2.channel_id) - set(int(c) for c in cc["channel_id"]))
+                    if gone:
+                        warnings.append(f"sfr_reaches lists channel(s) {gone[:5]} that channel_cells does not; "
+                                        "was the MODFLOW model built from this channel table?")
+                except EngineInputError:
+                    pass
+                if "fraction" in cc.columns:
+                    fs = cc.groupby("channel_id")["fraction"].sum()
+                    short = fs[fs < 1.0 - 1e-3]
+                    if len(short):
+                        warnings.append(
+                            f"channel_cells: {len(short)} channel(s) have pieces outside the grid (fractions sum "
+                            f"to less than 1; lowest {short.min():.3f}). Fractions are not rescaled; the "
+                            "channel's whole local flow is injected into its in-grid reaches")
+        except (OSError, ValueError) as exc:
+            errors.append(f"channel_cells: {exc}")
     if cfg.connections.well_cells:
         try:
             cio.read_well_cells(cfg.connections.well_cells, dims)

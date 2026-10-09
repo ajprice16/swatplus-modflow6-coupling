@@ -21,8 +21,11 @@ modflow:
     outer_dvclose: 1.0e-3
 
 connections:
-  hru_cells: connections/hru_cells.csv
-  channel_reaches: connections/channel_reaches.csv
+  hru_cells: connections/hru_cells.csv       # hru_id, layer, row, col, area_m2, fraction
+  channel_reaches: modflow/sfr_reaches.csv   # written by `swatplus-modflow build-modflow`; build first
+  # channel_cells: connections/channel_cells.csv   # optional: cross-checked by `validate`
+  # grid: modflow/grid.json                        # optional: checked against the model grid and crs
+  # well_cells: connections/well_cells.csv         # optional: layer, row, col, rate_m3d (negative = extraction)
 
 period:
   start: 2000-01-01
@@ -34,6 +37,10 @@ coupling:
   recharge_update: monthly       # daily | monthly | monthly_ramped
   recharge_delay_days: 0.0
   pumping_scale: 1.0
+  # recharge_to_water_table: true     # recharge goes to the highest wet cell of each column
+  # et_extinction_depth_m: 3.0        # overrides the EVT package's extinction depth
+  # evt_monthly_factors: [..12 values..]   # optional seasonal multipliers on the EVT rate; no default
+  # transmission_loss: {k_mm_per_h: 5.0, duration_h: 12.0}   # optional Lane-style channel loss
 
 checks:
   enforce_invariants: true

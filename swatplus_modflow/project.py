@@ -93,8 +93,15 @@ class ConnectionsSection(_Section):
     well_cells: Optional[Path] = Field(
         None, description="Optional pumping table well_cells.csv (layer, row, col, rate_m3d; MODFLOW sign: "
                           "negative = extraction). Added to the run as an extra WEL package.")
+    channel_cells: Optional[Path] = Field(
+        None, description="Optional channel_cells.csv (the GIS-side channel <-> cell table). Not needed to run; "
+                          "when given, validate cross-checks it against sfr_reaches.csv.")
+    grid: Optional[Path] = Field(
+        None, description="Optional grid.json. When given, validate checks it against the MODFLOW "
+                          "discretization and the project CRS.")
 
-    _paths = field_validator("hru_cells", "channel_reaches", "well_cells", mode="after")(_resolve)
+    _paths = field_validator("hru_cells", "channel_reaches", "well_cells", "channel_cells", "grid",
+                             mode="after")(_resolve)
 
 
 class PeriodSection(_Section):
@@ -188,6 +195,8 @@ class ProjectConfig(_Section):
 
     def missing_paths(self) -> list[str]:
         """Return descriptions of required input paths that do not exist."""
+        hints = {"connections.channel_reaches":
+                 " (written by `swatplus-modflow build-modflow <build spec>`; run the build first)"}
         checks = [
             ("swatplus.txtinout", self.swatplus.txtinout),
             ("modflow.sim_dir", self.modflow.sim_dir),
@@ -196,8 +205,11 @@ class ProjectConfig(_Section):
             ("connections.hru_cells", self.connections.hru_cells),
             ("connections.channel_reaches", self.connections.channel_reaches),
             ("connections.well_cells", self.connections.well_cells),
+            ("connections.channel_cells", self.connections.channel_cells),
+            ("connections.grid", self.connections.grid),
         ]
-        return [f"{k}: {p}" for k, p in checks if p is not None and not Path(p).exists()]
+        return [f"{k}: {p} not found{hints.get(k, '')}" for k, p in checks
+                if p is not None and not Path(p).exists()]
 
 
 def load_project(path: Path | str) -> ProjectConfig:
