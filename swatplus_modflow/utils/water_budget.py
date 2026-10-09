@@ -43,6 +43,7 @@ class WaterBudget:
     # Internal MODFLOW fluxes
     pumping_m3: float = 0.0           # Well extraction (negative)
     drain_outflow_m3: float = 0.0     # Tile drain discharge
+    other_net_m3: float = 0.0         # Net inflow of any other boundary package (CHD, GHB, ...)
     
     # Storage changes
     modflow_storage_change_m3: float = 0.0  # Aquifer head change
@@ -62,6 +63,7 @@ class WaterBudget:
             - self.channel_discharge_m3
             + self.pumping_m3  # negative
             - self.drain_outflow_m3
+            + self.other_net_m3
         )
     
     def compute_mass_balance_error(self) -> float:
@@ -111,6 +113,7 @@ class WaterBudget:
             'saturation_feedback_m3': self.saturation_feedback_m3,
             'pumping_m3': self.pumping_m3,
             'drain_outflow_m3': self.drain_outflow_m3,
+            'other_net_m3': self.other_net_m3,
             'modflow_storage_change_m3': self.modflow_storage_change_m3,
             'swat_soil_storage_change_m3': self.swat_soil_storage_change_m3,
             'net_aquifer_flux_m3': self.compute_net_aquifer_flux(),

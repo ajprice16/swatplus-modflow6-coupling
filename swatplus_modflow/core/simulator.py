@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -177,6 +178,11 @@ class SWATPlusMODFLOWCoupler:
     ):
         if settings is not None and not isinstance(settings, CouplingSettings):
             raise TypeError("settings must be a CouplingSettings instance")
+        warnings.warn(
+            "SWATPlusMODFLOWCoupler is a legacy facade: its file-based MODFLOW interface cannot apply "
+            "daily forcing and raises on the first day. Use the daily libmf6 engine "
+            "(`swatplus-modflow run project.yaml`).",
+            DeprecationWarning, stacklevel=2)
 
         if settings is None:
             missing = [

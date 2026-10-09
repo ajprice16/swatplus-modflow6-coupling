@@ -66,6 +66,9 @@ class SolverSection(_Section):
     complexity: Literal["simple", "moderate", "complex"] = "complex"
     newton: bool = Field(True, description="Use the Newton-Raphson formulation (recommended for dry/rewetting cells).")
     under_relaxation: bool = True
+    inner_rclose: Optional[float] = Field(
+        None, gt=0, description="Residual closure of the linear solver (model volume/time). "
+                                "Default: the value implied by 'complexity'.")
     outer_maximum: int = Field(200, gt=0)
     inner_maximum: int = Field(300, gt=0)
     outer_dvclose: float = Field(1.0e-3, gt=0, description="Head-change closure (model length units).")
@@ -84,9 +87,12 @@ class ModflowSection(_Section):
 
 
 class ConnectionsSection(_Section):
-    hru_cells: Path = Field(description="HRU <-> cell table (swat_obj_id, mf_layer, mf_row, mf_col, fraction).")
-    channel_reaches: Path = Field(description="SWAT+ channel <-> MF6 SFR reach table.")
-    well_cells: Optional[Path] = Field(None, description="Optional irrigation/pumping well table.")
+    hru_cells: Path = Field(description="HRU <-> cell table hru_cells.csv (hru_id, layer, row, col, area_m2, fraction).")
+    channel_reaches: Path = Field(description="SWAT+ channel <-> MF6 SFR reach table sfr_reaches.csv "
+                                              "(rno, channel_id, seq, layer, row, col, length_m).")
+    well_cells: Optional[Path] = Field(
+        None, description="Optional pumping table well_cells.csv (layer, row, col, rate_m3d; MODFLOW sign: "
+                          "negative = extraction). Added to the run as an extra WEL package.")
 
     _paths = field_validator("hru_cells", "channel_reaches", "well_cells", mode="after")(_resolve)
 
@@ -120,7 +126,20 @@ class CouplingSection(_Section):
     et_extinction_depth_m: Optional[float] = Field(
         None, gt=0, description="Overrides the EVT extinction depth when set; otherwise the EVT package value is used.")
     pumping_scale: float = Field(1.0, ge=0, description="Multiplier on well rates (0 disables pumping).")
+    well_auto_flow_reduce: Optional[float] = Field(
+        None, gt=0, le=1, description="AUTO_FLOW_REDUCE fraction for wells added from connections.well_cells "
+                                      "(throttle pumping as the cell thins). None = off.")
+    evt_monthly_factors: Optional[list[float]] = Field(
+        None, description="Optional 12 multipliers (January..December) applied to the EVT package rate. "
+                          "No default: the model's own rate is used unchanged when omitted.")
     transmission_loss: Optional[TransmissionLossSection] = None
+
+    @field_validator("evt_monthly_factors")
+    @classmethod
+    def _twelve(cls, v):
+        if v is not None and (len(v) != 12 or any(x < 0 for x in v)):
+            raise ValueError("evt_monthly_factors needs 12 non-negative values (January..December)")
+        return v
 
 
 class ChecksSection(_Section):
@@ -135,6 +154,7 @@ class OutputSection(_Section):
     save_heads: bool = True
     save_budget: bool = True
     save_daily_summary: bool = True
+    save_reach_flows: bool = Field(False, description="Also write per-reach daily outflow and stream-aquifer exchange.")
 
     _paths = field_validator("directory", mode="after")(_resolve)
 

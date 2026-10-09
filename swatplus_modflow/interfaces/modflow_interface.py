@@ -16,6 +16,16 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class FileBasedCouplingNotSupported(NotImplementedError):
+    """Raised by :meth:`MODFLOWInterface.advance_one_day`.
+
+    This interface edits FloPy objects in memory and then runs the ``mf6`` executable on the
+    files on disk, which still hold the original, unmodified model. The forcing it passes
+    in therefore never reaches the solver, and every day would silently repeat the same
+    solution (defect DEFECT-38). It is disabled rather than left silently wrong.
+    """
+
+
 class MODFLOWInterface:
     """
     Interface to MODFLOW 6 model via FloPy.
@@ -205,36 +215,12 @@ class MODFLOWInterface:
             - drain_exchange: Cell ID -> DRN outflow (m³/day)
             - budget: Global water budget
         """
-        try:
-            # Update stress period (stress period 1 = daily)
-            self._update_stress_period(
-                recharge_cells=recharge_cells,
-                et_cells=et_cells,
-                pumping_cells=pumping_cells,
-                channel_stages=channel_stages
-            )
-            
-            # Run MODFLOW solver
-            success = self._run_solver()
-            
-            if not success:
-                logger.error(f"MODFLOW solver failed on {current_date}")
-                return {}
-            
-            # Extract results from solution
-            results = {
-                'heads': self._extract_heads(),
-                'channel_exchange': self._extract_package_exchange('RIV'),
-                'drain_exchange': self._extract_package_exchange('DRN'),
-                'budget': self._get_water_budget(),
-            }
-            
-            return results
-            
-        except Exception as e:
-            logger.error(f"Error in advance_one_day: {e}")
-            return {}
-    
+        raise FileBasedCouplingNotSupported(
+            "MODFLOWInterface.advance_one_day cannot apply daily forcing: it changes in-memory FloPy "
+            "objects and then solves the unchanged files on disk, so the original model would be "
+            "solved every day (DEFECT-38). Use the daily libmf6 engine instead: "
+            "`swatplus-modflow run project.yaml` (see README.md and docs/ARCHITECTURE.md).")
+
     def _update_stress_period(
         self,
         recharge_cells: Dict[int, float],
