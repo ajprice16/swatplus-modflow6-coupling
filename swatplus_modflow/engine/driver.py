@@ -576,7 +576,13 @@ def run_daily(prep: Prepared, work_dir: Path, *, progress: Callable[[int, int, d
                 pass
         _write_partial(rows if "rows" in locals() else [], out_dir, pre)
         raise
-    ok_budget = tracker.validate_mass_balance(tolerance_percent=max(tol, 1.0))
+    # End-of-run check on the coupled budget, at the project's own tolerance
+    # (not loosened). With enforce_invariants it fails the run like the per-step checks.
+    ok_budget = tracker.validate_mass_balance(tolerance_percent=tol)
+    if not ok_budget and chk.enforce_invariants:
+        raise EngineRunError(
+            f"coupled water budget does not close within {tol}% on at least one day "
+            "(see the log); set checks.enforce_invariants: false to keep the output anyway")
     files = _write_outputs(cfg, prep, rows, budget_rows, final_heads, user_of, nlay, nrow, ncol,
                            out_dir, heads_file if cfg.output.save_heads else None, reach_files)
     return dict(files=files, n_days=n_days, n_nonconverged=n_fail, tracker_ok=bool(ok_budget),

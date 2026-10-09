@@ -200,3 +200,30 @@ def test_build_example_loads_against_its_schema_shape(tmp_path):
     assert spec.build_version == 1 and spec.properties.zones and spec.sfr is not None
     priorities = [z.priority for z in spec.properties.zones]
     assert len(set(priorities)) == len(priorities)
+
+
+def test_connection_fractions_keep_full_precision(tmp_path):
+    bf.write_layers(tmp_path)
+    assert main(["build-connections", "--grid", str(tmp_path / "grid.json"), "--hrus", str(tmp_path / "hrus.gpkg"),
+                 "--channels", str(tmp_path / "channels.gpkg"), "--out-dir", str(tmp_path / "conn")]) == 0
+    hru = pd.read_csv(tmp_path / "conn/hru_cells.csv")
+    sums = hru.groupby("hru_id")["fraction"].sum()
+    inside = sums[sums > 0.99]                      # HRUs entirely inside the grid
+    assert len(inside) >= 2
+    assert np.abs(inside - 1.0).max() < 1e-12      # 6-decimal rounding lost ~1e-5 per HRU
+
+
+@pytest.mark.skipif(LIB is None, reason="libmf6 not found (SWATPLUS_TEST_LIBMF6)")
+def test_end_of_run_budget_failure_fails_the_run(tmp_path, capsys, monkeypatch):
+    from swatplus_modflow.utils import water_budget
+    seen = {}
+
+    def fake_validate(self, tolerance_percent=1.0):
+        seen["tol"] = tolerance_percent
+        return False
+    monkeypatch.setattr(water_budget.WaterBudgetTracker, "validate_mass_balance", fake_validate)
+    p = _pipeline(tmp_path, capsys)
+    assert main(["run", str(p)]) == 2
+    assert seen["tol"] == pytest.approx(0.1)        # project tolerance, not loosened to 1%
+    manifest = __import__("json").loads((tmp_path / "results/run_manifest.json").read_text())
+    assert manifest["status"] == "failed"

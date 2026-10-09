@@ -12,7 +12,11 @@ Conventions shared by every file:
 * Lengths in metres, areas in m², in the project CRS, which must be projected.
 * CSV files are UTF-8, comma-separated, with a header row. Extra columns are
   allowed and ignored by readers that do not know them.
-* Every format carries a version. Readers refuse unknown major versions.
+* Every format carries a version. JSON files state it in a `format` key and
+  readers refuse unknown major versions. CSV files have no version line; a
+  table's version is implied by its header columns. Never add comment lines.
+* Float columns are written at full precision. Rounding fractions, e.g. to
+  6 decimals, loses water.
 
 ## 1. Project file — `project.yaml` (schema_version 1)
 
@@ -48,7 +52,8 @@ valid YAML.
   `[ytop - row*delc, ytop - (row-1)*delc]`.
 
 Grid polygon layer (GeoPackage, one polygon per cell): integer fields `row`,
-`col` and `active` (1 when the cell intersects the model domain, else 0).
+`col` and `active`. `active` is 1 when the cell overlaps the model domain with
+positive area; cells that only touch the domain boundary are 0.
 
 ## 3. HRU ↔ cell table — `hru_cells.csv` (format `swatplus-modflow-hru-cells/1`)
 
@@ -65,9 +70,13 @@ report HRUs whose fractions sum to less than 1, since that water leaves the
 model, rather than silently rescaling them.
 
 The engine converts SWAT+ percolation (mm/day over the `hru.con` area) to
-m³/day as `perc_mm * 1e-3 * area_hru_con_m2 * fraction`. It warns when the
-polygon area `sum(area_m2)` and the `hru.con` area of an HRU differ by more
-than 5%.
+m³/day as `perc_mm * 1e-3 * area_hru_con_m2 * fraction`. It warns when an
+HRU's whole-polygon area, `sum(area_m2) / sum(fraction)`, and its `hru.con`
+area differ by more than 5%.
+
+`hru_id` and `channel_id` are the `id` column of `hru.con` / `chandeg.con`.
+SWAT+ output rows are matched to them through the output `unit` column, with
+`gis_id` as a fallback when there is no `unit` column.
 
 ## 4. Channel ↔ cell table — `channel_cells.csv` (format `swatplus-modflow-channel-cells/1`)
 
@@ -79,10 +88,29 @@ than 5%.
 | `length_m` | float | channel length inside this cell |
 | `fraction` | float | `length_m` / total channel length |
 
+A channel that leaves and re-enters a cell has one row per contiguous piece,
+so `(channel_id, row, col)` may repeat with different `seq`. Pieces outside the
+grid have no row, so a channel's fractions can sum to less than 1. Readers
+warn and do not rescale. The engine spreads such a channel's whole local SWAT+
+flow over its in-grid reaches, in proportion to length, so SWAT+ channel water
+is conserved. This differs from HRUs, whose off-grid percolation leaves the
+model.
+
 The MODFLOW builder turns each row into one SFR reach (or RIV cell) and writes
 the reach ↔ channel map it creates, `sfr_reaches.csv` (`rno`, `channel_id`,
-`seq`, `layer`, `row`, `col`, `length_m`). The project file's
-`connections.channel_reaches` points at that file. Channel topology
+`seq`, `layer`, `row`, `col`, `length_m`), with `rno` **1-based** as in the
+MF6 SFR input. The project file's `connections.channel_reaches` points at that
+file, and `validate` reports an error telling the user to run `build-modflow`
+when it is missing. The optional `connections.channel_cells` and
+`connections.grid` fields record the front end's files, which `validate`
+cross-checks against the model.
+
+## 4a. Well table — `well_cells.csv` (optional)
+
+| column | type | meaning |
+|---|---|---|
+| `layer`, `row`, `col` | int | cell |
+| `rate_m3d` | float | MODFLOW sign convention: negative = extraction | Channel topology
 (downstream links) is read from the SWAT+ inputs, not from this table.
 
 ## 5. Engine command line
@@ -100,7 +128,9 @@ python -m swatplus_modflow run <project.yaml>
 * `validate` prints one problem per line, prefixed `ERROR:` or `WARNING:`.
 * `run` writes log lines to stdout. Progress lines are machine readable:
   `PROGRESS <done>/<total> <YYYY-MM-DD>`. The last line is
-  `RESULT succeeded <manifest path>` or `RESULT failed <reason>`.
+  `RESULT succeeded <absolute manifest path>` or `RESULT failed <reason>`.
+* `run` never builds the MODFLOW model; run `build-modflow <build_spec.yaml>`
+  first. `build-connections` writes the tables in sections 3 and 4.
 
 ## 6. Run manifest — `<output.directory>/run_manifest.json`
 
@@ -122,5 +152,7 @@ python -m swatplus_modflow run <project.yaml>
 
 * `path` is relative to the manifest's folder.
 * `kind: table`: any CSV, loaded as a table.
-* `kind: cell_values`: CSV with columns `layer,row,col,value` (optionally
-  `date`), which a front end joins to the grid layer on `row`,`col`.
+* `kind: cell_values`: CSV with columns `layer,row,col,value` and optionally
+  `date`, the ISO date of the time step the values refer to. Without `date`,
+  the values are for the final step. A front end joins it to the grid layer on
+  `row`,`col`.

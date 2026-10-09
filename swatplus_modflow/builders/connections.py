@@ -217,10 +217,10 @@ def write_connections(out_dir: Path, hru_df: Optional[pd.DataFrame], hru_report:
     out_dir.mkdir(parents=True, exist_ok=True)
     files = {}
     if hru_df is not None:
-        hru_df.to_csv(out_dir / "hru_cells.csv", index=False, float_format="%.6f")
+        hru_df.to_csv(out_dir / "hru_cells.csv", index=False, float_format="%.17g")
         files["hru_cells"] = "hru_cells.csv"
     if ch_df is not None:
-        ch_df.to_csv(out_dir / "channel_cells.csv", index=False, float_format="%.6f")
+        ch_df.to_csv(out_dir / "channel_cells.csv", index=False, float_format="%.17g")
         files["channel_cells"] = "channel_cells.csv"
     (out_dir / "connections_report.json").write_text(json.dumps(
         {"hru_cells": hru_report, "channel_cells": ch_report, "files": files}, indent=2))
