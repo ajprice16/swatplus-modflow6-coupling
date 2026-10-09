@@ -20,6 +20,17 @@ from .widgets import PathEdit
 ISO = "yyyy-MM-dd"
 
 
+def _initial_size(widget, width, height):
+    """Preferred size, shrunk to fit the screen (the form scrolls, so the dialog can be small)."""
+    from qgis.PyQt.QtWidgets import QApplication
+    screen = widget.screen() if hasattr(widget, "screen") else None
+    screen = screen or QApplication.primaryScreen()
+    if screen is None:
+        return width, height
+    avail = screen.availableGeometry()
+    return min(width, int(avail.width() * 0.95)), min(height, int(avail.height() * 0.9))
+
+
 class RunDialog(QDialog):
     """Project form + run controls.
 
@@ -32,7 +43,7 @@ class RunDialog(QDialog):
         self.iface = iface
         self.qgis_project = project or QgsProject.instance()
         self.setWindowTitle("SWAT+ MODFLOW 6 - project and run")
-        self.resize(780, 820)
+        self.resize(*_initial_size(self, 780, 820))
         self.proc: Optional[EngineProcess] = None
         self.last_manifest: Optional[str] = None
         self.loaded_layers = []
@@ -107,8 +118,21 @@ class RunDialog(QDialog):
         self.sim_dir = PathEdit("folder", title="MODFLOW 6 simulation folder")
         self.libmf6 = PathEdit("file", title="libmf6 shared library")
         self.model_name = QLineEdit()
+        self.initial_heads = PathEdit("file", "MODFLOW head files (*.hds *.bhd);;All files (*)",
+                                      "starting heads (optional)")
+        self.initial_heads.setToolTip("Binary head file whose last record is used as starting heads. "
+                                      "Default: the MODFLOW IC package")
         self.hru_cells = PathEdit("file", "CSV (*.csv)", "hru_cells.csv")
-        self.channel_reaches = PathEdit("file", "CSV (*.csv)", "channel / reach table")
+        self.channel_reaches = PathEdit("file", "CSV (*.csv)", "sfr_reaches.csv (written by build-modflow)")
+        self.channel_reaches.setToolTip("sfr_reaches.csv written by 'swatplus-modflow build-modflow' "
+                                        "into the MODFLOW folder")
+        self.channel_cells = PathEdit("file", "CSV (*.csv)", "channel_cells.csv (optional)")
+        self.channel_cells.setToolTip("channel_cells.csv from 'Build channel connections'. Optional; when set the "
+                                      "engine reports the flow from channel length outside the grid that it "
+                                      "injects into the in-grid reaches")
+        self.grid_json = PathEdit("file", "JSON (*.json)", "grid.json (optional)")
+        self.grid_json.setToolTip("grid.json from 'Create MODFLOW grid'. Optional; validate checks it against the "
+                                  "MODFLOW model")
         self.well_cells = PathEdit("file", "CSV (*.csv)", "well cells table (optional)")
         today = QDate.currentDate()
         self.start = QDateEdit(today.addYears(-1))
@@ -139,7 +163,9 @@ class RunDialog(QDialog):
         for label, w in (("Project name", self.name), ("CRS", self.crs), ("SWAT+ TxtInOut", self.txtinout),
                          ("SWAT+ executable", self.executable), ("", self.run_swatplus), ("MODFLOW 6 folder", self.sim_dir),
                          ("libmf6 library", self.libmf6), ("MODFLOW model name (optional)", self.model_name),
-                         ("hru_cells.csv", self.hru_cells), ("Channel / reach table", self.channel_reaches),
+                         ("Starting heads (optional)", self.initial_heads),
+                         ("hru_cells.csv", self.hru_cells), ("SFR reach table", self.channel_reaches),
+                         ("channel_cells.csv (optional)", self.channel_cells), ("grid.json (optional)", self.grid_json),
                          ("Well cells (optional)", self.well_cells), ("Period start", self.start), ("Period end", self.end),
                          ("Spin-up days", self.spinup), ("Recharge update", self.recharge_update),
                          ("Recharge delay (days)", self.recharge_delay), ("Pumping scale", self.pumping_scale),
@@ -158,7 +184,9 @@ class RunDialog(QDialog):
             channel_reaches=self.channel_reaches.text(),
             start=self.start.date().toString(ISO), end=self.end.date().toString(ISO),
             executable=self.executable.text() or None, run_swatplus=self.run_swatplus.isChecked(),
-            model_name=self.model_name.text().strip() or None, well_cells=self.well_cells.text() or None,
+            model_name=self.model_name.text().strip() or None,
+            initial_heads=self.initial_heads.text() or None, well_cells=self.well_cells.text() or None,
+            channel_cells=self.channel_cells.text() or None, grid=self.grid_json.text() or None,
             spinup_days=self.spinup.value(), recharge_update=None if ru.startswith("(") else ru,
             recharge_delay_days=opt(self.recharge_delay), pumping_scale=opt(self.pumping_scale),
             mass_balance_tolerance_percent=opt(self.mb_tol), output_directory=self.out_dir.text() or None,
@@ -175,9 +203,12 @@ class RunDialog(QDialog):
         self.sim_dir.setText(str(mfs.get("sim_dir", "")))
         self.libmf6.setText(str(mfs.get("libmf6", "")))
         self.model_name.setText(str(mfs.get("model_name", "") or ""))
+        self.initial_heads.setText(str(mfs.get("initial_heads", "") or ""))
         self.hru_cells.setText(str(con.get("hru_cells", "")))
         self.channel_reaches.setText(str(con.get("channel_reaches", "")))
         self.well_cells.setText(str(con.get("well_cells", "") or ""))
+        self.channel_cells.setText(str(con.get("channel_cells", "") or ""))
+        self.grid_json.setText(str(con.get("grid", "") or ""))
         for widget, key in ((self.start, "start"), (self.end, "end")):
             d = QDate.fromString(str(per.get(key, "")), ISO)
             if d.isValid():

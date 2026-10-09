@@ -7,7 +7,7 @@ with MODFLOW 6 groundwater flow model.
 """
 
 __version__ = "0.1.0"
-__author__ = "Hydrologic Coupling Team"
+__author__ = "Alexander Price"
 
 
 def __getattr__(name):

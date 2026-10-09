@@ -2,3 +2,4 @@
 *.pdf binary
 *.png binary
 *.gpkg binary
+*.bat text eol=crlf

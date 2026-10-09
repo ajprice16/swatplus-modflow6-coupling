@@ -1,0 +1,92 @@
+name: qgis
+
+# The plugin's headless tests and GUI screenshots on several QGIS versions (Qt5 and Qt6) on Linux and
+# Windows. The 'gui-comparison' artifact holds index.html with every captured version side by side.
+on:
+  push:
+    paths: ["qgis_plugin/**", ".github/workflows/qgis.yml"]
+  pull_request:
+    paths: ["qgis_plugin/**", ".github/workflows/qgis.yml"]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"   # weekly, to catch new QGIS point releases
+
+jobs:
+  linux:
+    name: QGIS ${{ matrix.label }} (Linux)
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: "3.40 Qt5", slug: linux-3.40, image: "qgis/qgis:3.40-noble" }
+          - { label: "3.44 LTR Qt5", slug: linux-3.44, image: "qgis/qgis:3.44-noble" }
+          - { label: "4.2 Qt6", slug: linux-4.2, image: "qgis/qgis:4.2-trixie" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Headless tests
+        run: bash qgis_plugin/tests/run_qgis_tests.sh
+      - name: GUI screenshots
+        if: always()
+        run: bash qgis_plugin/tests/run_qgis_tests.sh capture shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gui-${{ matrix.slug }}
+          path: shots
+          if-no-files-found: warn
+
+  windows:
+    name: QGIS ${{ matrix.label }} (Windows)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: "LTR", slug: windows-ltr, choco: qgis-ltr }
+          - { label: "latest", slug: windows-latest, choco: qgis }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QGIS
+        run: choco install ${{ matrix.choco }} -y --no-progress
+      - name: Locate QGIS
+        shell: pwsh
+        run: |
+          $root = Get-ChildItem "C:\Program Files" -Directory -Filter "QGIS*" | Sort-Object Name | Select-Object -Last 1
+          if (-not $root) { throw "QGIS install folder not found" }
+          Write-Output "QGIS_ROOT=$($root.FullName)" >> $env:GITHUB_ENV
+          Get-ChildItem "$($root.FullName)\bin" -Filter "python-qgis*.bat" | ForEach-Object { $_.Name }
+      - name: Headless tests
+        shell: cmd
+        run: call qgis_plugin\tests\run_qgis_tests.bat "%QGIS_ROOT%"
+      - name: GUI screenshots
+        if: always()
+        shell: cmd
+        run: call qgis_plugin\tests\run_qgis_tests.bat "%QGIS_ROOT%" capture "%GITHUB_WORKSPACE%\shots"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gui-${{ matrix.slug }}
+          path: shots
+          if-no-files-found: warn
+
+  comparison:
+    name: GUI comparison page
+    needs: [linux, windows]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gui-*
+          path: shots
+          merge-multiple: true
+      - name: Build index.html
+        run: python3 qgis_plugin/tests/qgis/capture_gui.py --sheet shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-comparison
+          path: shots

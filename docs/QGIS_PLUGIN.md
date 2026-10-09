@@ -94,9 +94,37 @@ the package from a local folder or a URL; the exact commands are shown and must 
 * `PYTHONPATH=. python -m pytest qgis_plugin/tests -q`: standard-library modules, the project file against the
   engine's `load_project`, packaging, the fake engine against the CLI contract, and a static scan for Qt5/Qt6
   incompatibilities (`exec_`, unscoped enums, `QVariant` field types, direct PyQt imports).
-* `QGIS_APP=/path/to/QGIS.app qgis_plugin/tests/run_qgis_tests.sh`: headless tests inside QGIS's own Python
-  (algorithms on synthetic layers, plugin load/unload, installing the zip into a temporary profile, run dialog
-  with a fake engine that obeys the CLI contract). The tests use a temporary profile, never the user's.
-  `QGIS_APP=... pytest qgis_plugin/tests` runs the same suite through `test_qgis_suite.py`.
+* Headless tests inside QGIS's own Python (algorithms on synthetic layers, plugin load/unload, installing the zip
+  into a temporary profile, run dialog with a fake engine that obeys the CLI contract). They use a temporary
+  profile, never yours:
 
-Only QGIS 4.x (Qt6) has been exercised by these tests so far; a Qt5 run on QGIS 3.40 or later is still to be done.
+  | QGIS install | command |
+  |---|---|
+  | macOS app bundle | `QGIS_APP=/Applications/QGIS.app qgis_plugin/tests/run_qgis_tests.sh` |
+  | Linux packages / qgis Docker images | `qgis_plugin/tests/run_qgis_tests.sh` |
+  | Linux Flatpak | `QGIS_FLATPAK=1 qgis_plugin/tests/run_qgis_tests.sh` |
+  | Windows (standalone installer or OSGeo4W) | `qgis_plugin\tests\run_qgis_tests.bat "C:\Program Files\QGIS 3.44.15"` |
+
+## Visual comparison across QGIS versions
+
+`capture` renders every plugin window (dock, engine settings, run dialog empty and filled, and each Processing
+tool's dialog) to PNG, in a folder named after the QGIS version, Qt version and platform:
+
+```
+qgis_plugin/tests/run_qgis_tests.sh capture ~/plugin-shots                                   (macOS/Linux)
+qgis_plugin\tests\run_qgis_tests.bat "C:\Program Files\QGIS 3.44.15" capture C:\plugin-shots   (Windows)
+qgis_plugin\tests\run_qgis_tests.bat "C:\Program Files\QGIS 4.2.3"  capture C:\plugin-shots
+```
+
+Each run rebuilds `index.html` in the output folder: one row per window, one column per captured version.
+Cells are red when a window failed to open or failed a layout check (minimum size larger than 1366x768, or
+clipped button/label text). Folders from different machines can be copied into one output folder and
+`python qgis_plugin/tests/qgis/capture_gui.py --sheet <folder>` rebuilds the page. The command exits non-zero
+when a window fails, so it can be scripted.
+
+On macOS the Processing tool dialogs are reported as *skipped*: QGIS's own Processing parameter widgets abort
+under Qt's offscreen platform there, independently of this plugin. Capture them on Linux or Windows.
+
+GitHub Actions (`.github/workflows/qgis.yml`) runs the tests and the capture on QGIS 3.40 and 3.44 LTR (Qt5) and
+4.2 (Qt6) on Linux and on the current LTR and latest QGIS on Windows, weekly and on every plugin change. The
+`gui-comparison` artifact of a run contains the combined `index.html`.

@@ -48,7 +48,8 @@ def build_project_dict(*, name: str, crs: str, txtinout: str, sim_dir: str, libm
                        hru_cells: str, channel_reaches: str, start, end,
                        executable: Optional[str] = None, run_swatplus: bool = True,
                        model_name: Optional[str] = None, initial_heads: Optional[str] = None,
-                       well_cells: Optional[str] = None, spinup_days: int = 0,
+                       well_cells: Optional[str] = None, channel_cells: Optional[str] = None,
+                       grid: Optional[str] = None, spinup_days: int = 0,
                        recharge_update: Optional[str] = None, recharge_delay_days: Optional[float] = None,
                        pumping_scale: Optional[float] = None, recharge_to_water_table: Optional[bool] = None,
                        et_extinction_depth_m: Optional[float] = None,
@@ -74,6 +75,10 @@ def build_project_dict(*, name: str, crs: str, txtinout: str, sim_dir: str, libm
     conn: Dict[str, Any] = {"hru_cells": rp(hru_cells), "channel_reaches": rp(channel_reaches)}
     if well_cells:
         conn["well_cells"] = rp(well_cells)
+    if channel_cells:
+        conn["channel_cells"] = rp(channel_cells)
+    if grid:
+        conn["grid"] = rp(grid)
 
     coupling: Dict[str, Any] = {}
     for key, val in (("recharge_update", recharge_update), ("recharge_delay_days", recharge_delay_days),
