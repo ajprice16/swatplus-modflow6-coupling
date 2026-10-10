@@ -50,7 +50,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install QGIS
-        run: choco install ${{ matrix.choco }} -y --no-progress
+        id: install
+        shell: pwsh
+        run: |
+          # the Chocolatey download from qgis.org fails now and then; try three times
+          for ($i = 1; $i -le 3; $i++) {
+            choco install ${{ matrix.choco }} -y --no-progress
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Output "attempt $i failed (exit $LASTEXITCODE); retrying in 30 s"
+            Start-Sleep -Seconds 30
+          }
+          exit 1
       - name: Locate QGIS
         shell: pwsh
         run: |
@@ -62,7 +72,7 @@ jobs:
         shell: cmd
         run: call qgis_plugin\tests\run_qgis_tests.bat "%QGIS_ROOT%"
       - name: GUI screenshots
-        if: always()
+        if: always() && steps.install.outcome == 'success'
         shell: cmd
         run: call qgis_plugin\tests\run_qgis_tests.bat "%QGIS_ROOT%" capture "%GITHUB_WORKSPACE%\shots"
       - uses: actions/upload-artifact@v4
