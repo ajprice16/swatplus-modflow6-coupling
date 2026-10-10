@@ -267,6 +267,11 @@ def capture(out_root: Path) -> int:
     skipped = [n for n, w in info["windows"].items() if w["status"] == "skipped"]
     print(f"captured {len(info['windows']) - len(bad) - len(skipped)}/{len(info['windows'])} windows cleanly "
           f"into {out} ({len(skipped)} skipped on this platform)")
+    if os.environ.get("GITHUB_ACTIONS"):
+        f = info.get("font", {})
+        print(f"::notice title=GUI {tag}::font {f.get('family')} {f.get('point_size')} pt, avg char "
+              f"{f.get('avg_char_width_px')} px; {len(info['windows']) - len(bad) - len(skipped)} ok, "
+              f"{len(skipped)} skipped, {len(bad)} with problems")
     for n, w in bad.items():
         msg = w.get('error') or '; '.join(w['problems'])
         print(f"  {n}: {msg}")

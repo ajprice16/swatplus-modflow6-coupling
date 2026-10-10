@@ -43,10 +43,10 @@ class ChannelConnectionsAlgorithm(QgsProcessingAlgorithm):
                 "share in its daily summary when this table is set as connections.channel_cells in the "
                 "project.\n\n"
                 "Direction assumption: each channel is digitised upstream to downstream (as in the stream layer "
-                "produced by QSWAT+, 'rivs1'). Tick 'Reverse' if your layer is digitised the other way. "
+                "produced by QSWAT+, 'rivs1'). Tick 'Lines run downstream to upstream' if your layer is digitised the other way. "
                 "Optionally give a DEM: the elevation at both ends of every channel is compared and the channel is "
-                "oriented downhill, overriding both the digitising direction and 'Reverse'; channels the DEM cannot "
-                "decide (equal elevations or no data) fall back to the digitising direction (and 'Reverse'). The log "
+                "oriented downhill, overriding both the digitising direction and that option; channels the DEM cannot "
+                "decide (equal elevations or no data) fall back to the digitising direction (and that option). The log "
                 "reports how many channels the DEM flipped.\n\n"
                 "Multipart features are chained end to end (flipping parts as needed); joins wider than the "
                 "tolerance are reported. The id field defaults to 'Channel' as in QSWAT+ 'rivs1'.")
