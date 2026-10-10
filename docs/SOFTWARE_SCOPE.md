@@ -1,8 +1,4 @@
-# Software scope — what belongs in this repository
-
-This package is **study-area agnostic**. Anything that names a watershed, a
-dataset unique to one region, or a path on someone's machine belongs in a
-separate application repository, not here.
+# Software scope 
 
 ## Include
 
