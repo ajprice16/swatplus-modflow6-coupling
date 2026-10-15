@@ -103,7 +103,14 @@ the package from a local folder or a URL; the exact commands are shown and must 
   | macOS app bundle | `QGIS_APP=/Applications/QGIS.app qgis_plugin/tests/run_qgis_tests.sh` |
   | Linux packages / qgis Docker images | `qgis_plugin/tests/run_qgis_tests.sh` |
   | Linux Flatpak | `QGIS_FLATPAK=1 qgis_plugin/tests/run_qgis_tests.sh` |
-  | Windows (standalone installer or OSGeo4W) | `qgis_plugin\tests\run_qgis_tests.bat "C:\Program Files\QGIS 3.44.15"` |
+  | Windows standalone installer | `qgis_plugin\tests\run_qgis_tests.bat "C:\Program Files\QGIS 3.44.15"` |
+  | Windows OSGeo4W (every QGIS build in it) | `qgis_plugin\tests\run_qgis_tests.bat C:\OSGeo4W` |
+  | Windows OSGeo4W (one build) | `qgis_plugin\tests\run_qgis_tests.bat C:\OSGeo4W --variant ltr` |
+
+  An OSGeo4W root can hold several QGIS builds, each with its own launcher in `bin`:
+  `python-qgis-ltr.bat` (variant `ltr`), `python-qgis.bat` (`qgis`), `python-qgis-qt6.bat` (`qt6`) and
+  `python-qgis-dev.bat` (`dev`). The runner uses every launcher it finds, each in a separate `cmd` process,
+  and ends with a summary line (`Ran 2 QGIS build(s): ltr qgis`) and a non-zero exit code if any build failed.
 
 ## Visual comparison across QGIS versions
 
@@ -112,8 +119,8 @@ tool's dialog) to PNG, in a folder named after the QGIS version, Qt version and 
 
 ```
 qgis_plugin/tests/run_qgis_tests.sh capture ~/plugin-shots                                   (macOS/Linux)
-qgis_plugin\tests\run_qgis_tests.bat "C:\Program Files\QGIS 3.44.15" capture C:\plugin-shots   (Windows)
-qgis_plugin\tests\run_qgis_tests.bat "C:\Program Files\QGIS 4.2.3"  capture C:\plugin-shots
+qgis_plugin\tests\run_qgis_tests.bat C:\OSGeo4W capture C:\plugin-shots                          (Windows, all OSGeo4W builds)
+qgis_plugin\tests\run_qgis_tests.bat "C:\Program Files\QGIS 4.2.3" capture C:\plugin-shots      (Windows standalone)
 ```
 
 Each run rebuilds `index.html` in the output folder: one row per window, one column per captured version.
@@ -126,5 +133,6 @@ On macOS the Processing tool dialogs are reported as *skipped*: QGIS's own Proce
 under Qt's offscreen platform there, independently of this plugin. Capture them on Linux or Windows.
 
 GitHub Actions (`.github/workflows/qgis.yml`) runs the tests and the capture on QGIS 3.40 and 3.44 LTR (Qt5) and
-4.2 (Qt6) on Linux and on the current LTR and latest QGIS on Windows, weekly and on every plugin change. The
+4.2 (Qt6) on Linux, on the current LTR and latest QGIS on Windows (standalone installers), and on one OSGeo4W
+root holding both builds, weekly and on every plugin change. The
 `gui-comparison` artifact of a run contains the combined `index.html`.

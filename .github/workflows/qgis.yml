@@ -82,9 +82,58 @@ jobs:
           path: shots
           if-no-files-found: warn
 
+  osgeo4w:
+    # One OSGeo4W root with two QGIS builds (LTR and latest): the runner must test and capture both.
+    name: QGIS LTR + latest (Windows, OSGeo4W)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OSGeo4W with qgis-ltr and qgis
+        id: install
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://download.osgeo.org/osgeo4w/v2/osgeo4w-setup.exe -OutFile osgeo4w-setup.exe
+          for ($i = 1; $i -le 3; $i++) {
+            $p = Start-Process -FilePath .\osgeo4w-setup.exe -Wait -PassThru -ArgumentList @(
+              "--advanced", "--autoaccept", "--quiet-mode", "--no-desktop", "--no-startmenu",
+              "--root", "C:\OSGeo4W", "--site", "https://download.osgeo.org/osgeo4w/v2",
+              "--local-package-dir", "C:\OSGeo4W-cache", "--packages", "qgis-ltr,qgis")
+            if ((Test-Path C:\OSGeo4W\bin\python-qgis-ltr.bat) -and (Test-Path C:\OSGeo4W\bin\python-qgis.bat)) { break }
+            Write-Output "attempt $i: setup exit $($p.ExitCode), launchers missing; retrying"
+            Start-Sleep -Seconds 30
+          }
+          Get-ChildItem C:\OSGeo4W\bin -Filter "python-qgis*.bat" | ForEach-Object { $_.Name }
+          if (-not (Test-Path C:\OSGeo4W\bin\python-qgis-ltr.bat) -or -not (Test-Path C:\OSGeo4W\bin\python-qgis.bat)) { exit 1 }
+      - name: Headless tests (every build)
+        shell: cmd
+        run: |
+          call qgis_plugin\tests\run_qgis_tests.bat C:\OSGeo4W > tests.log 2>&1
+          set RC=%ERRORLEVEL%
+          type tests.log
+          findstr /c:"Ran 2 QGIS build(s)" tests.log || exit /b 1
+          exit /b %RC%
+      - name: One build only (--variant ltr)
+        shell: cmd
+        run: |
+          call qgis_plugin\tests\run_qgis_tests.bat C:\OSGeo4W --variant ltr > one.log 2>&1
+          set RC=%ERRORLEVEL%
+          type one.log
+          findstr /c:"Ran 1 QGIS build(s): ltr" one.log || exit /b 1
+          exit /b %RC%
+      - name: GUI screenshots (every build)
+        if: always() && steps.install.outcome == 'success'
+        shell: cmd
+        run: call qgis_plugin\tests\run_qgis_tests.bat C:\OSGeo4W capture shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gui-windows-osgeo4w
+          path: shots
+          if-no-files-found: warn
+
   comparison:
     name: GUI comparison page
-    needs: [linux, windows]
+    needs: [linux, windows, osgeo4w]
     if: always()
     runs-on: ubuntu-latest
     steps:
