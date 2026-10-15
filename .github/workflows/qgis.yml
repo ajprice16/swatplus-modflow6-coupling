@@ -99,7 +99,7 @@ jobs:
               "--root", "C:\OSGeo4W", "--site", "https://download.osgeo.org/osgeo4w/v2",
               "--local-package-dir", "C:\OSGeo4W-cache", "--packages", "qgis-ltr,qgis")
             if ((Test-Path C:\OSGeo4W\bin\python-qgis-ltr.bat) -and (Test-Path C:\OSGeo4W\bin\python-qgis.bat)) { break }
-            Write-Output "attempt $i: setup exit $($p.ExitCode), launchers missing; retrying"
+            Write-Output "attempt ${i}: setup exit $($p.ExitCode), launchers missing; retrying"
             Start-Sleep -Seconds 30
           }
           Get-ChildItem C:\OSGeo4W\bin -Filter "python-qgis*.bat" | ForEach-Object { $_.Name }

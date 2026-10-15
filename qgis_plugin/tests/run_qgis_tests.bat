@@ -13,6 +13,9 @@ rem because the OSGeo4W launchers change PATH and the next build would otherwise
 rem Capturing several builds into the same OUTFOLDER puts them side by side in index.html.
 rem Tests use a throw-away profile folder, never your QGIS profile.
 setlocal EnableExtensions EnableDelayedExpansion
+rem Record this script's folder and name now: SHIFT below also shifts %0.
+set "HERE=%~dp0"
+set "SELF=%~nx0"
 set "QGIS_ROOT=%~1"
 if "%QGIS_ROOT%"=="" goto :usage
 if not exist "%QGIS_ROOT%\bin\" (
@@ -53,7 +56,14 @@ if not defined QT_QPA_PLATFORM set "QT_QPA_PLATFORM=offscreen"
 rem The offscreen platform finds no fonts on Windows unless told where they are.
 if not defined QT_QPA_FONTDIR set "QT_QPA_FONTDIR=%WINDIR%\Fonts"
 set "PYTHONDONTWRITEBYTECODE=1"
-cd /d "%~dp0qgis"
+cd /d "%HERE%qgis" || (
+  echo cannot change to "%HERE%qgis"
+  exit /b 2
+)
+if not exist "capture_gui.py" (
+  echo capture_gui.py not found in "%CD%"
+  exit /b 2
+)
 
 set /a FOUND=0
 set /a FAILED=0
@@ -100,5 +110,5 @@ if errorlevel 1 (
 exit /b 0
 
 :usage
-echo usage: %~nx0 "QGIS install folder or OSGeo4W root" [--variant ltr^|qgis^|qt6^|dev] [capture OUTFOLDER]
+echo usage: %SELF% "QGIS install folder or OSGeo4W root" [--variant ltr^|qgis^|qt6^|dev] [capture OUTFOLDER]
 exit /b 2
