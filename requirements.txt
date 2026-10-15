@@ -1,2 +1,0 @@
-# Superseded by pyproject.toml (this file can be deleted). Equivalent install:
--e .[dev]
